@@ -1,16 +1,25 @@
 // Convenient BOJ — 채점 현황 페이지
-// 분할 화면의 [제출]로 열린 창(이름: cboj-submit)에서만 동작한다.
-// 백준이 이 페이지에서 결과를 실시간으로 갱신하면, 그 내용을 storage로 분할 화면에 알려 주고
-// 채점이 끝나면 창을 닫는다.
+// 분할 화면의 [제출]로 열린 제출 창(B)에서만 동작한다.
+// 1) 제출 직후 이 페이지가 열리면 포커스를 문제 탭(A)으로 돌려 달라고 백그라운드에 알린다.
+// 2) B는 뒤에서 채점 결과를 읽어 storage로 A에 전달하고, 채점이 끝나면 백그라운드가 B를 닫는다.
 (() => {
-  if (window.name !== 'cboj-submit' || globalThis.__cbojStatusLoaded) return;
+  if (globalThis.__cbojStatusLoaded) return;
   globalThis.__cbojStatusLoaded = true;
   const ext = globalThis.__cbojChromeShim || globalThis.chrome;
   const FINAL = globalThis.CBOJ_FINAL;
   const parseRow = globalThis.cbojParseRow;
+  const send = (msg) => Promise.resolve(ext.runtime.sendMessage(msg)).catch(() => ({}));
 
-  ext.storage.local.get({ cbojWatch: null }, ({ cbojWatch: w }) => {
-    if (!w || Date.now() - w.at > 15 * 60 * 1000) return;
+  send({ type: 'cboj:is-submit-window' }).then((r) => {
+    if (!r || !r.isSubmitWindow) return;
+    ext.storage.local.get({ cbojWatch: null }, ({ cbojWatch: w }) => {
+      if (!w || Date.now() - w.at > 15 * 60 * 1000) return;
+      send({ type: 'cboj:submitted' }); // A로 포커스 돌려주기
+      watch(w);
+    });
+  });
+
+  function watch(w) {
     let solId = sessionStorage.getItem('cbojSolId');
     let last = '';
     let lastChange = Date.now();
@@ -37,7 +46,7 @@
         clearInterval(fallback);
         ext.storage.local.remove('cbojWatch');
         sessionStorage.removeItem('cbojSolId');
-        setTimeout(() => window.close(), 1500);
+        send({ type: 'cboj:judge-done' }); // 백그라운드가 이 창을 닫는다
       }
     };
 
@@ -48,5 +57,5 @@
       if (Date.now() - lastChange > 6000) location.reload();
     }, 2000);
     tick();
-  });
+  }
 })();

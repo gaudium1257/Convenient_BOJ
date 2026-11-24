@@ -94,10 +94,88 @@ async function run({ lang, code, stdin }) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
-  if (msg && msg.type === 'cboj:run') {
-    run(msg).then(respond);
-    return true; // 비동기 응답
+// ───────── 제출 창 관리 ─────────
+// A(문제 + 분할 화면)에서 [제출] → 작은 제출 창 B를 연다.
+// B에서 제출하면(채점 현황으로 넘어가면) 포커스를 A로 돌려주고,
+// B는 뒤에서 채점 결과를 읽어 A에 전달한 뒤 채점이 끝나면 닫는다.
+const SESSION_KEY = 'cbojSubmitWin';
+const getWin = async () => (await chrome.storage.session.get(SESSION_KEY))[SESSION_KEY] || null;
+const setWin = (v) => (v ? chrome.storage.session.set({ [SESSION_KEY]: v }) : chrome.storage.session.remove(SESSION_KEY));
+
+async function openSubmit(msg, sender) {
+  const old = await getWin();
+  if (old) {
+    await setWin(null); // 이전 창이 닫혀도 '닫혔어요' 알림이 가지 않게 먼저 지운다
+    try { await chrome.windows.remove(old.winId); } catch { /* 이미 닫힘 */ }
   }
-  return undefined;
+  // sender.tab.url은 tabs 권한이 없으면 비어 있을 수 있어서, 보낸 쪽이 알려 준 주소를 검사해 쓴다.
+  const origin = ['https://acmicpc.net', 'https://www.acmicpc.net'].includes(msg.origin) ? msg.origin : 'https://www.acmicpc.net';
+  if (!/^\d+$/.test(String(msg.pid))) return { ok: false, error: 'bad problem id' };
+  const w = await chrome.windows.create({
+    url: `${origin}/submit/${msg.pid}`,
+    type: 'popup',
+    width: 860,
+    height: 780,
+    focused: true,
+  });
+  await setWin({
+    winId: w.id,
+    pid: String(msg.pid),
+    token: msg.token,
+    originTabId: sender.tab.id,
+    originWinId: sender.tab.windowId,
+    submitted: false,
+  });
+  return { ok: true };
+}
+
+async function isSubmitWindow(sender) {
+  const s = await getWin();
+  return !!(s && sender.tab && sender.tab.windowId === s.winId);
+}
+
+async function focusOrigin(s) {
+  try { await chrome.windows.update(s.originWinId, { focused: true }); } catch { /* A 창이 닫힘 */ }
+  try { await chrome.tabs.update(s.originTabId, { active: true }); } catch { /* A 탭이 닫힘 */ }
+}
+
+async function onSubmitted(sender) {
+  const s = await getWin();
+  if (!s || sender.tab.windowId !== s.winId || s.submitted) return { ok: true };
+  await setWin({ ...s, submitted: true });
+  await focusOrigin(s);
+  return { ok: true };
+}
+
+async function onJudgeDone(sender) {
+  const s = await getWin();
+  if (!s || sender.tab.windowId !== s.winId) return { ok: true };
+  await setWin(null);
+  setTimeout(() => { chrome.windows.remove(s.winId).catch(() => {}); }, 1200);
+  return { ok: true };
+}
+
+// 채점이 끝나기 전에 사용자가 제출 창을 닫은 경우 A에 알려 준다.
+chrome.windows.onRemoved.addListener(async (winId) => {
+  const s = await getWin();
+  if (!s || s.winId !== winId) return;
+  await setWin(null);
+  chrome.storage.local.set({ cbojJudge: { token: s.token, stage: s.submitted ? 'closed' : 'cancelled' } });
+});
+
+const HANDLERS = {
+  'cboj:run': (msg) => run(msg),
+  'cboj:open-submit': openSubmit,
+  'cboj:is-submit-window': async (_msg, sender) => ({ ok: true, isSubmitWindow: await isSubmitWindow(sender) }),
+  'cboj:submitted': (_msg, sender) => onSubmitted(sender),
+  'cboj:judge-done': (_msg, sender) => onJudgeDone(sender),
+};
+
+chrome.runtime.onMessage.addListener((msg, sender, respond) => {
+  const fn = msg && HANDLERS[msg.type];
+  if (!fn) return undefined;
+  Promise.resolve(fn(msg, sender))
+    .then(respond)
+    .catch((e) => respond({ ok: false, error: String(e && e.message || e) }));
+  return true; // 비동기 응답
 });

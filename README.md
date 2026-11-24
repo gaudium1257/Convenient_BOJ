@@ -35,10 +35,12 @@
 | ![](docs/screenshots/03-run-pass.jpg) | ![](docs/screenshots/04-run-wrong.jpg) | ![](docs/screenshots/05-compile-error-dark.jpg) |
 
 ### 제출 → 정/오답 확인
-1. 분할 화면에서 **제출**(Ctrl + Shift + Enter)을 누르면 작은 백준 제출 창이 열리고, **작성한 코드와 언어가 채워져 있어요.**
-2. 그 창에서 백준의 **[제출]** 버튼만 누르면 돼요.
+1. 분할 화면(A)에서 **제출**(Ctrl + Shift + Enter)을 누르면 작은 백준 제출 창(B)이 열리고, **작성한 코드와 언어가 채워져 있어요.**
+2. B에서 백준의 **[제출]** 버튼만 누르면 돼요.
    백준 제출에는 보안 확인(reCAPTCHA)이 있어서, 마지막 버튼은 사람이 직접 눌러야 해요.
-3. 채점 현황이 분할 화면의 **정/오답 확인** 탭에 `채점 중 → 맞았습니다!!` 로 실시간 표시되고, 끝나면 제출 창은 자동으로 닫혀요.
+3. 제출하자마자 **포커스가 A로 돌아와요.** B는 뒤에서 채점 현황을 지켜보고,
+   A의 **정/오답 확인** 탭에 `채점 중 → 맞았습니다!!` 가 실시간으로 표시돼요.
+4. 채점이 끝나면 **B는 자동으로 닫혀요.** 채점 전에 B를 직접 닫으면 A에 "제출 기록 열기" 안내가 떠요.
 
 | 채워진 제출 창 | 분할 화면에 뜬 결과 |
 | --- | --- |
@@ -78,12 +80,12 @@
 
 ```
 manifest.json            확장 설정 (MV3)
-background.js            코드 실행 요청 (Wandbox API)
+background.js            코드 실행(Wandbox API), 제출 창 열기·포커스·닫기
 content/split.js         분할 화면: 에디터, 실행 터미널, 제출 창 열기, 채점 결과 표시
 content/split.css
 content/submit.js        제출 페이지: 코드·언어 채우기 안내, 언어 목록 저장
 content/submit-main.js   제출 페이지(페이지 world): 백준 에디터에 코드 넣기
-content/status.js        채점 현황 페이지: 결과를 분할 화면으로 전달, 끝나면 창 닫기
+content/status.js        채점 현황 페이지: A로 포커스 돌리기, 결과를 분할 화면으로 전달
 popup/                   설정 팝업
 shared/defaults.js       공통 기본 설정
 shared/boj.js            채점 결과 읽기

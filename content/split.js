@@ -432,23 +432,36 @@
       return;
     }
     saveDraft(false);
-    submitToken = Math.random().toString(36).slice(2);
-    // 팝업 차단을 피하려면 클릭 직후 바로 열어야 한다.
-    const w = window.open(`/submit/${PID}`, 'cboj-submit', 'popup,width=860,height=780');
-    if (!w) {
-      setCard('err', '제출 창이 차단됐어요', '주소창 오른쪽의 팝업 차단 아이콘을 눌러 이 사이트의 팝업을 허용해주세요.');
-      return;
-    }
-    store.set('local', {
-      cbojPending: { pid: PID, langId: currentLang().id, langName: currentLang().name, code, codeOpen: settings.codeOpen, token: submitToken, at: Date.now() },
-      cbojJudge: null,
-    });
+    const token = Math.random().toString(36).slice(2);
+    submitToken = token;
     setCard('pending', '제출 창을 여는 중…', `${PID}번 · ${currentLang().name}`);
     setStatus('제출 대기', 'busy');
+    // 코드를 먼저 저장한 뒤, 백그라운드에 제출 창(B)을 열어 달라고 한다.
+    const pending = { pid: PID, langId: currentLang().id, langName: currentLang().name, code, codeOpen: settings.codeOpen, token, at: Date.now() };
+    Promise.resolve(ext.storage.local.set({ cbojPending: pending, cbojJudge: null }))
+      .then(() => ext.runtime.sendMessage({ type: 'cboj:open-submit', pid: PID, token, origin: location.origin }))
+      .then((res) => {
+        if (!res || !res.ok) throw new Error(res && res.error);
+      })
+      .catch(() => {
+        if (submitToken !== token) return;
+        setCard('err', '제출 창을 열지 못했어요', '확장 프로그램이 업데이트됐다면 이 페이지를 새로고침 해주세요.',
+          h('a', { class: 'cboj-link', href: `/submit/${PID}`, target: '_blank', text: '제출 페이지 직접 열기 →' }));
+        setStatus('제출 실패', 'err');
+      });
   }
 
   function onJudge(j) {
     if (!ui || !j || j.token !== submitToken) return;
+    if (j.stage === 'closed' || j.stage === 'cancelled') {
+      const statusUrl = `/status?problem_id=${PID}&user_id=${encodeURIComponent(me)}`;
+      setCard(j.stage === 'closed' ? 'pending' : 'empty',
+        j.stage === 'closed' ? '채점이 끝나기 전에 제출 창이 닫혔어요' : '제출 창을 닫았어요',
+        j.stage === 'closed' ? '결과는 제출 기록에서 확인할 수 있어요.' : '제출하지 않았어요.',
+        j.stage === 'closed' ? h('a', { class: 'cboj-link', href: statusUrl, target: '_blank', text: '제출 기록 열기 →' }) : null);
+      setStatus(j.stage === 'closed' ? '결과 확인 필요' : '', j.stage === 'closed' ? 'busy' : '');
+      return;
+    }
     if (j.stage === 'filled') {
       const warn = j.langOk ? null
         : h('div', { class: 'cboj-card-sub warn', text: `⚠ 제출 페이지 언어 목록에 ${j.langName || '선택한 언어'}가 없어요. 제출 창에서 언어를 직접 골라주세요.` });
