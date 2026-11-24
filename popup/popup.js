@@ -49,10 +49,15 @@
   };
   const isCustom = (l) => !!(s.templates && typeof s.templates[l] === 'string' && s.templates[l] !== TEMPLATES[l]);
 
-  function showState(kind) {
+  function showState(kind, message) {
     tplState.className = 'tpl-state ' + (kind || '');
-    tplState.textContent = kind === 'dirty' ? '저장 안 됨' : kind === 'saved' ? '저장했어요' : (isCustom(lang) ? '내가 바꾼 코드' : '기본값');
+    tplState.textContent = message
+      || (kind === 'dirty' ? '저장 안 됨' : kind === 'saved' ? '저장했어요' : (isCustom(lang) ? '내가 바꾼 코드' : '기본값'));
   }
+
+  // 크롬 동기화 저장소는 항목 하나에 8KB(키 이름 + JSON 길이)까지만 들어간다.
+  const SYNC_ITEM_LIMIT = 8192;
+  const syncItemBytes = (key, value) => new TextEncoder().encode(key + JSON.stringify(value)).length;
 
   function showTemplate() {
     tplLang.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
@@ -60,18 +65,33 @@
     showState();
   }
 
-  function saveTemplate(text) {
+  // 저장에 성공하면 true. 실패하면 이유를 보여 주고 이전 상태를 유지한다.
+  async function saveTemplate(text) {
     const templates = { ...(s.templates || {}) };
     if (text === TEMPLATES[lang]) delete templates[lang]; // 기본값과 같으면 따로 저장하지 않는다
     else templates[lang] = text;
+
+    const bytes = syncItemBytes('templates', templates);
+    if (bytes > SYNC_ITEM_LIMIT) {
+      const kb = (n) => (n / 1024).toFixed(1);
+      showState('error', `너무 길어서 저장하지 못했어요 (세 언어 합계 ${kb(bytes)}KB / 최대 8KB)`);
+      return false;
+    }
+    try {
+      await ext.storage.sync.set({ templates });
+    } catch (e) {
+      showState('error', '저장하지 못했어요: ' + ((e && e.message) || '알 수 없는 오류'));
+      return false;
+    }
     s.templates = templates;
-    ext.storage.sync.set({ templates });
+    return true;
   }
 
   tplLang.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.dataset.lang === lang) return;
-    if (tplState.classList.contains('dirty') && !confirm('저장하지 않은 기본 코드가 있어요. 그래도 다른 언어로 넘어갈까요?')) return;
+    const unsaved = tplState.classList.contains('dirty') || tplState.classList.contains('error');
+    if (unsaved && !confirm('저장하지 않은 기본 코드가 있어요. 그래도 다른 언어로 넘어갈까요?')) return;
     lang = b.dataset.lang;
     showTemplate();
   });
@@ -86,14 +106,12 @@
       document.getElementById('tplSave').click();
     }
   });
-  document.getElementById('tplSave').addEventListener('click', () => {
-    saveTemplate(tplText.value);
-    showState('saved');
+  document.getElementById('tplSave').addEventListener('click', async () => {
+    if (await saveTemplate(tplText.value)) showState('saved');
   });
-  document.getElementById('tplReset').addEventListener('click', () => {
+  document.getElementById('tplReset').addEventListener('click', async () => {
     tplText.value = TEMPLATES[lang];
-    saveTemplate(TEMPLATES[lang]);
-    showState('saved');
+    if (await saveTemplate(TEMPLATES[lang])) showState('saved');
   });
 
   if (ext) ext.storage.sync.get(DEFAULTS, (v) => { s = { ...DEFAULTS, ...v }; render(); showTemplate(); });

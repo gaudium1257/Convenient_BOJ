@@ -81,6 +81,7 @@ h2 { margin: 0; font-size: 13px; font-weight: 700; }
 .tpl-state { font-size: 11px; color: var(--muted); flex: 1; }
 .tpl-state.dirty { color: #E67700; font-weight: 600; }
 .tpl-state.saved { color: #2B9348; font-weight: 600; }
+.tpl-state.error { color: #DD4124; font-weight: 600; }
 .mini { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 3px 9px; font-size: 12px; }
 .mini:hover { border-color: #B8C0C8; }
 .mini.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
