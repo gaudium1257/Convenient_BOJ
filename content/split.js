@@ -6,8 +6,8 @@
   globalThis.__cbojSplitLoaded = true;
 
   const PID = pathMatch[1];
-  const ext = globalThis.__bojKittyChromeShim || globalThis.chrome;
-  const DEFAULTS = globalThis.BOJ_KITTY_DEFAULTS;
+  const ext = globalThis.__cbojChromeShim || globalThis.chrome;
+  const DEFAULTS = globalThis.CBOJ_DEFAULTS;
   const CM = globalThis.CodeMirror;
   if (!ext || !ext.storage || !DEFAULTS || !CM) return;
 
@@ -80,7 +80,6 @@
     return lines.join('\n');
   };
   const parseHTML = (text) => new DOMParser().parseFromString(text, 'text/html');
-  const emit = (name, detail) => document.dispatchEvent(new CustomEvent(name, { detail }));
 
   const store = {
     get: (area, defaults) => new Promise((r) => { try { ext.storage[area].get(defaults, (v) => r(v || defaults)); } catch { r(defaults); } }),
@@ -244,7 +243,6 @@
   function applyLayout() {
     document.documentElement.style.setProperty('--cboj-w', layout.width + 'vw');
     if (ui) ui.panel.style.setProperty('--cboj-bottom-h', layout.bottom + 'px');
-    emit('cboj:layout', { right: Math.round((innerWidth * layout.width) / 100) });
   }
 
   function showTab(name) {
@@ -399,13 +397,11 @@
           ? `예제 ${judged}개 모두 맞았어요! 🎉`
           : `예제 ${judged}개 중 ${passed}개 맞음`));
         setStatus(all ? '예제 통과' : `예제 ${passed}/${judged}`, all ? 'ok' : 'err');
-        emit('cboj:samples', { passed, total: judged });
       } else {
         setStatus('실행 완료', '');
       }
     } else {
       setStatus('컴파일 에러', 'err');
-      emit('cboj:samples', { passed: 0, total: list.length, compileError: true });
     }
     running = false;
     ui.btnRun.disabled = false;
@@ -590,7 +586,6 @@
         ui.card.append(meta);
         setStatus(done ? row.text : '채점 중…', done ? (row.key === 'ac' ? 'ok' : 'err') : 'busy');
         if (done) {
-          emit('cboj:judge', { result: row.key, text: row.text });
           loadHistory();
           return;
         }
@@ -670,7 +665,6 @@
     document.documentElement.classList.remove('cboj-open');
     ui.panel.hidden = true;
     toggleBtn.classList.remove('active');
-    emit('cboj:layout', { right: 0 });
   }
   const toggle = () => (isOpen ? close() : open());
 

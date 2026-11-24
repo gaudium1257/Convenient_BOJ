@@ -7,33 +7,16 @@
 </head>
 <body>
   <header class="top">
-    <svg class="face" viewBox="0 0 64 56" aria-hidden="true">
-      <path d="M9 26 L11 4 L27 15 Z" fill="#F6B35B" stroke="#B9732A" stroke-width="2.4" stroke-linejoin="round"/>
-      <path d="M37 15 L53 4 L55 26 Z" fill="#F6B35B" stroke="#B9732A" stroke-width="2.4" stroke-linejoin="round"/>
-      <path d="M14 21 L15 10 L23 16 Z" fill="#FFB4B4"/>
-      <path d="M41 16 L49 10 L50 21 Z" fill="#FFB4B4"/>
-      <ellipse cx="32" cy="32" rx="25" ry="21" fill="#F6B35B" stroke="#B9732A" stroke-width="2.4"/>
-      <path d="M27 13 l1 6 M32 12 v7 M37 13 l-1 6" stroke="#E0842A" stroke-width="2.4" stroke-linecap="round"/>
-      <ellipse cx="32" cy="41" rx="10" ry="7" fill="#FFF1DC"/>
-      <ellipse cx="23" cy="31" rx="2.8" ry="3.6" fill="#3A2A22"/>
-      <ellipse cx="41" cy="31" rx="2.8" ry="3.6" fill="#3A2A22"/>
-      <circle cx="24" cy="29.6" r="1" fill="#fff"/>
-      <circle cx="42" cy="29.6" r="1" fill="#fff"/>
-      <path d="M30 37 h4 l-2 2.3 Z" fill="#FF8FA3"/>
-      <path d="M32 39.3 v1 M28.5 40.5 q1.75 2 3.5 0 q1.75 2 3.5 0" fill="none" stroke="#5B3A26" stroke-width="1.5" stroke-linecap="round"/>
-      <ellipse cx="15" cy="38" rx="3.5" ry="2.2" fill="#FF9BAE" opacity=".6"/>
-      <ellipse cx="49" cy="38" rx="3.5" ry="2.2" fill="#FF9BAE" opacity=".6"/>
-    </svg>
+    <img class="logo" src="../icons/icon48.png" alt="" width="36" height="36">
     <div class="title">
       <h1>Convenient BOJ</h1>
-      <p id="tagline">오늘도 같이 AC 받자냥</p>
+      <p>문제 · 코드 · 실행 · 제출을 한 화면에서</p>
     </div>
   </header>
 
-  <section class="card split">
-    <div class="row"><h2>⇆ 코드 작성 화면</h2><span class="kbd">Alt + C</span></div>
+  <section class="card">
     <label class="toggle">
-      <span><b>문제를 열면 바로 펼치기</b><small>꺼져 있으면 제목 옆 [⇆ 코드 작성] 버튼으로 열어요</small></span>
+      <span><b>문제를 열면 바로 펼치기</b><small>꺼져 있으면 제목 옆 [⇆ 코드 작성] 버튼이나 Alt+C로 열어요</small></span>
       <input type="checkbox" data-key="splitAutoOpen"><i></i>
     </label>
     <div class="row">
@@ -53,70 +36,16 @@
     </div>
   </section>
 
-  <div class="kitty-head">
-    <h2>🐾 냥이</h2>
-    <label class="switch" title="냥이 켜기/끄기">
-      <input type="checkbox" id="enabled" aria-label="냥이 켜기">
-      <span></span>
-    </label>
-  </div>
-  <main id="panel">
-    <section class="card bond">
-      <div class="bond-row">
-        <span class="label">친밀도</span>
-        <span class="bond-level" id="bondLevel">낯가리는 중</span>
-        <span class="bond-count"><b id="bondCount">0</b> <span class="h">♥</span></span>
-      </div>
-      <div class="bar"><i id="bondBar"></i></div>
-      <p class="hint">눌러주고, 커서로 문질러 쓰다듬고, 츄르를 주면 올라가요.</p>
-    </section>
-
-    <section class="card">
-      <div class="row">
-        <h2>고양이 수</h2>
-        <div class="seg" data-key="count">
-          <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button>
-        </div>
-      </div>
-      <div id="furRows"></div>
-    </section>
-
-    <section class="card">
-      <div class="row">
-        <h2>크기</h2>
-        <div class="seg" data-key="size">
-          <button data-v="small">작게</button><button data-v="medium">보통</button><button data-v="large">크게</button>
-        </div>
-      </div>
-      <div class="row">
-        <h2>성격</h2>
-        <div class="seg" data-key="speed">
-          <button data-v="slow">느긋</button><button data-v="normal">보통</button><button data-v="fast">활발</button>
-        </div>
-      </div>
-    </section>
-
-    <section class="card toggles">
-      <label class="toggle">
-        <span><b>코드 칠 땐 조용히</b><small>입력 중이면 식빵 굽고 흐릿해져요</small></span>
-        <input type="checkbox" data-key="quietWhileTyping"><i></i>
-      </label>
-      <label class="toggle">
-        <span><b>채점 결과에 반응</b><small>채점 현황에서 결과가 나오면 축하·위로해요</small></span>
-        <input type="checkbox" data-key="judgeReactions"><i></i>
-      </label>
-      <label class="toggle">
-        <span><b>눈으로 커서 따라보기</b></span>
-        <input type="checkbox" data-key="eyeFollow"><i></i>
-      </label>
-    </section>
-  </main>
-
-  <footer>
-    <button id="churu" class="primary">🍡 츄르 주기</button>
-    <button id="party" class="ghost" title="축하 리액션 미리보기">🎉</button>
-  </footer>
-  <div id="toast" role="status" aria-live="polite"></div>
+  <section class="card keys">
+    <h2>단축키</h2>
+    <dl>
+      <dt>Alt + C</dt><dd>분할 화면 열기/닫기</dd>
+      <dt>Ctrl + Enter</dt><dd>예제로 실행</dd>
+      <dt>Ctrl + Shift + Enter</dt><dd>제출</dd>
+      <dt>Ctrl + S</dt><dd>코드 저장</dd>
+    </dl>
+  </section>
+  <p class="note">실행은 Wandbox(wandbox.org) 서버에서 해요.</p>
 
   <script src="../shared/defaults.js"></script>
   <script src="popup.js"></script>

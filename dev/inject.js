@@ -41,7 +41,7 @@
     return { ok: true, compiler, options, status: j.status, signal: j.signal || '', compileError: j.compiler_error || '',
       stdout: j.program_output || '', stderr: j.program_error || '', ms: Date.now() - t };
   }
-  window.__bojKittyChromeShim = {
+  window.__cbojChromeShim = {
     runtime: {
       id: 'dev',
       getURL: (p) => BASE + p,
@@ -55,7 +55,7 @@
   }
   const scripts = ['vendor/codemirror/codemirror.js', 'vendor/codemirror/clike.js', 'vendor/codemirror/python.js',
     'vendor/codemirror/matchbrackets.js', 'vendor/codemirror/closebrackets.js', 'shared/defaults.js',
-    'content/kitty.js', 'content/split.js'];
+    'content/split.js'];
   (async () => {
     for (const s of scripts) {
       await new Promise((res, rej) => {

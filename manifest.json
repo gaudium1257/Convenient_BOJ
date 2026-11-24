@@ -3,7 +3,7 @@
   "name": "Convenient BOJ - 편한 백준",
   "short_name": "Convenient BOJ",
   "version": "1.0.0",
-  "description": "백준 문제 화면에서 코드 작성·실행(C/C++/Python)·제출·채점 결과 확인까지 한 번에. 귀여운 냥이는 덤!",
+  "description": "백준 문제 화면에서 코드 작성·실행(C/C++/Python)·제출·채점 결과 확인까지 한 번에.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -21,16 +21,18 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage"],
-  "host_permissions": ["https://wandbox.org/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://wandbox.org/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://www.acmicpc.net/*", "https://acmicpc.net/*"],
-      "js": ["shared/defaults.js", "content/kitty.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://www.acmicpc.net/problem/*", "https://acmicpc.net/problem/*"],
+      "matches": [
+        "https://www.acmicpc.net/problem/*",
+        "https://acmicpc.net/problem/*"
+      ],
       "js": [
         "vendor/codemirror/codemirror.js",
         "vendor/codemirror/clike.js",
@@ -40,14 +42,11 @@
         "shared/defaults.js",
         "content/split.js"
       ],
-      "css": ["vendor/codemirror/codemirror.css", "content/split.css"],
+      "css": [
+        "vendor/codemirror/codemirror.css",
+        "content/split.css"
+      ],
       "run_at": "document_idle"
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["content/kitty.css"],
-      "matches": ["https://www.acmicpc.net/*", "https://acmicpc.net/*"]
     }
   ]
 }
