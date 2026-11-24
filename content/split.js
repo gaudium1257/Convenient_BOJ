@@ -41,24 +41,7 @@
     return null;
   }
 
-  // ───────── 채점 결과 분류 ─────────
-  const FINAL = ['ac', 'pac', 'wa', 'pe', 'tle', 'mle', 'ole', 'rte', 'ce'];
-  const TEXT_RULES = [
-    [/맞았습니다/, 'ac'], [/출력 형식/, 'pe'], [/틀렸습니다/, 'wa'], [/시간 초과/, 'tle'],
-    [/메모리 초과/, 'mle'], [/출력 초과/, 'ole'], [/런타임 에러/, 'rte'], [/컴파일 에러/, 'ce'],
-    [/^\s*\d+(\.\d+)?\s*점/, 'pac'],
-  ];
-  function resultKey(span, text) {
-    if (span) {
-      for (const c of span.classList) {
-        const m = /^result-(.+)$/.exec(c);
-        if (!m || m[1] === 'text') continue;
-        if (FINAL.includes(m[1])) return m[1];
-      }
-    }
-    for (const [re, k] of TEXT_RULES) if (re.test(text || '')) return k;
-    return 'pending';
-  }
+  const FINAL = globalThis.CBOJ_FINAL || ['ac', 'pac', 'wa', 'pe', 'tle', 'mle', 'ole', 'rte', 'ce'];
 
   // ───────── 유틸 ─────────
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -73,13 +56,11 @@
     for (const kid of kids) if (kid != null) el.append(kid);
     return el;
   };
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const normalize = (s) => {
     const lines = String(s).replace(/\r/g, '').split('\n').map((l) => l.replace(/[ \t]+$/, ''));
     while (lines.length && lines[lines.length - 1] === '') lines.pop();
     return lines.join('\n');
   };
-  const parseHTML = (text) => new DOMParser().parseFromString(text, 'text/html');
 
   const store = {
     get: (area, defaults) => new Promise((r) => { try { ext.storage[area].get(defaults, (v) => r(v || defaults)); } catch { r(defaults); } }),
@@ -103,12 +84,10 @@
   let langs = FALLBACK_LANGS.filter((l) => langInfo(l.name));
   let langId = null;
   let me = ($('meta[name="username"]') || {}).content || '';
-  let submitInfo = null; // { loggedIn, form doc }
   let ui = null;
   let cm = null;
   let saveTimer = 0;
   let running = false;
-  let submitting = false;
 
   const currentLang = () => langs.find((l) => l.id === langId) || langs[0];
   const currentInfo = () => langInfo(currentLang().name);
@@ -128,14 +107,8 @@
     const status = h('span', { class: 'cboj-status' });
 
     const card = h('div', { class: 'cboj-card empty', text: '제출하면 이곳에서 채점 결과를 실시간으로 볼 수 있어요.' });
-    const histBody = h('tbody');
     const histWrap = h('div', { class: 'cboj-hist' },
-      h('div', { class: 'cboj-hist-head' },
-        h('b', { text: '이 문제 내 제출' }),
-        h('button', { class: 'cboj-link', text: '새로고침', onclick: () => loadHistory() })),
-      h('table', {}, h('thead', {}, h('tr', {},
-        h('th', { text: '제출 번호' }), h('th', { text: '결과' }), h('th', { text: '메모리' }),
-        h('th', { text: '시간' }), h('th', { text: '언어' }), h('th', { text: '제출한 시간' }))), histBody));
+      h('a', { class: 'cboj-link', target: '_blank', href: `/status?problem_id=${PID}&user_id=${encodeURIComponent(me)}`, text: '이 문제 내 제출 기록 보기 →' }));
     const paneResult = h('div', { class: 'cboj-pane result active' }, card, histWrap);
 
     const termOut = h('div', { class: 'cboj-term-out', role: 'log' });
@@ -158,7 +131,7 @@
       editor, resizerY, bottom);
     document.body.appendChild(panel);
 
-    ui = { panel, langSel, editor, bottom, card, histBody, termOut, termIn, status, tabResult, tabTerm, paneResult, paneTerm, btnRun, btnSubmit };
+    ui = { panel, langSel, editor, bottom, card, termOut, termIn, status, tabResult, tabTerm, paneResult, paneTerm, btnRun, btnSubmit };
 
     cm = CM(editor, {
       value: '',
@@ -431,41 +404,10 @@
   }
 
   // ───────── 백준 제출 ─────────
-  async function fetchSubmitPage() {
-    try {
-      const res = await fetch(`/submit/${PID}`, { credentials: 'include', cache: 'no-store' });
-      if (/\/login/.test(new URL(res.url).pathname)) return { loggedIn: false };
-      const doc = parseHTML(await res.text());
-      const form = doc.querySelector('#submit_form') || doc.querySelector('form[action*="/submit"]');
-      const name = (doc.querySelector('meta[name="username"]') || {}).content || '';
-      if (name) me = name;
-      return { loggedIn: true, doc, form, url: res.url };
-    } catch {
-      return { loggedIn: null };
-    }
-  }
-
-  function adoptLanguages(doc) {
-    const sel = doc && doc.querySelector('select[name="language"]');
-    if (!sel) return;
-    const found = [...sel.options]
-      .map((o) => ({ id: o.value, name: o.textContent.trim() }))
-      .filter((l) => l.id !== '' && langInfo(l.name));
-    if (!found.length) return;
-    const order = (l) => ['cpp', 'c', 'py'].indexOf(langInfo(l.name).family);
-    langs = found.sort((a, b) => order(a) - order(b));
-  }
-
-  function needsCaptcha(doc) {
-    return !!(doc && doc.querySelector('.g-recaptcha, .cf-turnstile, .h-captcha, [data-sitekey]'));
-  }
-
-  function fallbackToSubmitPage(reason) {
-    const code = cm.getValue();
-    try { navigator.clipboard.writeText(code); } catch { /* 무시 */ }
-    setCard('err', reason, '코드를 클립보드에 복사했어요. 열린 제출 페이지에 붙여넣고 제출해주세요.');
-    window.open(`/submit/${PID}`, '_blank');
-  }
+  // 백준은 스크립트 요청(fetch)에 빈 응답을 주고 제출에 reCAPTCHA를 쓰므로,
+  // 진짜 제출 페이지를 작은 창으로 열어 코드·언어를 채워 두고 [제출]은 사용자가 직접 누른다.
+  // 결과는 그 창의 채점 현황 페이지(content/status.js)가 storage로 알려 준다.
+  let submitToken = null;
 
   function setCard(kind, title, sub, extra) {
     const c = ui.card;
@@ -476,154 +418,73 @@
     if (extra) c.append(extra);
   }
 
-  async function submit() {
-    if (submitting) return;
-    const code = cm.getValue();
-    if (!code.trim()) { showTab('result'); setCard('err', '코드가 비어 있어요'); return; }
-    submitting = true;
-    ui.btnSubmit.disabled = true;
-    showTab('result');
-    saveDraft(false);
-    setStatus('제출 중…', 'busy');
-    setCard('pending', '제출하는 중…', `${PID}번 · ${currentLang().name}`);
-    try {
-      const page = await fetchSubmitPage();
-      if (page.loggedIn === false) {
-        setCard('err', '로그인이 필요해요', '백준에 로그인한 뒤 다시 제출해주세요.',
-          h('a', { class: 'cboj-link', href: `/login?next=${encodeURIComponent(location.pathname)}`, text: '로그인하러 가기 →' }));
-        return;
-      }
-      if (!page.form) { fallbackToSubmitPage('제출 폼을 찾지 못했어요'); return; }
-      if (needsCaptcha(page.doc)) { fallbackToSubmitPage('제출 페이지에서 보안 확인이 필요해요'); return; }
-
-      const fd = new FormData();
-      for (const el of page.form.elements) {
-        if (!el.name || el.disabled) continue;
-        const type = (el.type || '').toLowerCase();
-        if (['submit', 'button', 'file', 'reset'].includes(type)) continue;
-        if ((type === 'radio' || type === 'checkbox') && !el.checked) continue;
-        fd.append(el.name, el.value);
-      }
-      fd.set('source', code);
-      fd.set('language', currentLang().id);
-      if (!fd.has('problem_id')) fd.set('problem_id', PID);
-      if (settings.codeOpen && settings.codeOpen !== 'default') fd.set('code_open', settings.codeOpen);
-
-      const action = new URL(page.form.getAttribute('action') || `/submit/${PID}`, location.origin + `/submit/${PID}`);
-      const res = await fetch(action.href, { method: 'POST', body: fd, credentials: 'include' });
-      const after = new URL(res.url);
-      if (!/\/status/.test(after.pathname)) {
-        const doc = parseHTML(await res.text());
-        const msg = (doc.querySelector('.alert-danger, .alert, .error-v1, .help-block') || {}).textContent;
-        setCard('err', '제출하지 못했어요', (msg || '백준이 제출을 받지 않았어요.').trim().replace(/\s+/g, ' '),
-          h('button', { class: 'cboj-link', text: '제출 페이지에서 직접 제출하기 →', onclick: () => fallbackToSubmitPage('직접 제출') }));
-        setStatus('제출 실패', 'err');
-        return;
-      }
-      await watch(after.href);
-    } catch (e) {
-      setCard('err', '제출 중 문제가 생겼어요', String(e && e.message || e));
-      setStatus('제출 실패', 'err');
-    } finally {
-      submitting = false;
-      ui.btnSubmit.disabled = false;
-    }
-  }
-
-  function parseRow(tr) {
-    // 열: 제출 번호 | 아이디 | 문제 | 결과 | 메모리 | 시간 | (채점 서버) | 언어 | 코드 길이 | 제출한 시간
-    const td = [...tr.querySelectorAll('td')];
-    const span = tr.querySelector('.result-text');
-    const txt = (el) => ((el || {}).textContent || '').trim();
-    const text = (span ? span.textContent : txt(td[3])).trim();
-    const hasPlatform = !!tr.querySelector('td.judge-platform') || td.length >= 10;
-    const langIdx = hasPlatform ? 7 : 6;
-    const mem = txt(tr.querySelector('td.memory') || td[4]);
-    const time = txt(tr.querySelector('td.time') || td[5]);
-    const last = td[td.length - 1];
-    const timeEl = last && last.querySelector('[data-original-title], [title]');
-    return {
-      id: txt(td[0]),
-      text,
-      key: resultKey(span, text),
-      memory: mem ? (/^\d+$/.test(mem) ? mem + ' KB' : mem) : '',
-      time: time ? (/^\d+$/.test(time) ? time + ' ms' : time) : '',
-      lang: txt(td[langIdx]),
-      length: txt(td[langIdx + 1]),
-      when: timeEl ? (timeEl.getAttribute('data-original-title') || timeEl.getAttribute('title')) : txt(last),
-    };
-  }
-
-  function statusRows(doc) {
-    return [...doc.querySelectorAll('#status-table tbody tr')].filter((tr) => tr.querySelectorAll('td').length >= 6);
-  }
-
   function badge(row) {
     return h('span', { class: 'cboj-res ' + (FINAL.includes(row.key) ? row.key : 'pending'), text: row.text || '기다리는 중' });
   }
 
-  async function watch(statusUrl) {
-    let solId = null;
-    const started = Date.now();
-    while (Date.now() - started < 5 * 60 * 1000) {
-      let row = null;
-      try {
-        const doc = parseHTML(await (await fetch(statusUrl, { credentials: 'include', cache: 'no-store' })).text());
-        const rows = statusRows(doc);
-        const tr = solId ? rows.find((r) => r.id === 'solution-' + solId) : rows[0];
-        if (tr) row = parseRow(tr);
-      } catch { /* 다음 번에 다시 시도 */ }
-      if (row) {
-        solId = solId || row.id;
-        const done = FINAL.includes(row.key);
-        const meta = h('div', { class: 'cboj-card-meta' },
-          h('span', { text: `#${row.id}` }),
-          row.memory ? h('span', { text: `메모리 ${row.memory}` }) : null,
-          row.time ? h('span', { text: `시간 ${row.time}` }) : null,
-          h('a', { href: `/source/${row.id}`, target: '_blank', text: '코드 보기' }));
-        setCard(done ? row.key : 'pending', '', '', null);
-        ui.card.firstChild.replaceWith(h('div', { class: 'cboj-card-title' }, badge(row)));
-        ui.card.append(meta);
-        setStatus(done ? row.text : '채점 중…', done ? (row.key === 'ac' ? 'ok' : 'err') : 'busy');
-        if (done) {
-          loadHistory();
-          return;
-        }
-      }
-      await sleep(row ? 1000 : 1500);
-    }
-    setCard('err', '채점 결과를 기다리다 멈췄어요', '채점 현황 페이지에서 확인해주세요.',
-      h('a', { class: 'cboj-link', href: statusUrl, target: '_blank', text: '채점 현황 열기 →' }));
-  }
-
-  async function loadHistory() {
-    if (!ui) return;
-    const body = ui.histBody;
+  function submit() {
+    const code = cm.getValue();
+    showTab('result');
+    if (!code.trim()) { setCard('err', '코드가 비어 있어요'); return; }
     if (!me) {
-      body.textContent = '';
-      body.append(h('tr', {}, h('td', { colspan: '6', class: 'muted', text: '로그인하면 이 문제의 내 제출 기록이 보여요.' })));
+      setCard('err', '로그인이 필요해요', '백준에 로그인한 뒤 다시 제출해주세요.',
+        h('a', { class: 'cboj-link', href: `/login?next=${encodeURIComponent(location.pathname)}`, text: '로그인하러 가기 →' }));
       return;
     }
-    try {
-      const url = `/status?problem_id=${PID}&user_id=${encodeURIComponent(me)}&language_id=-1&result_id=-1`;
-      const doc = parseHTML(await (await fetch(url, { credentials: 'include', cache: 'no-store' })).text());
-      const rows = statusRows(doc).slice(0, 10).map(parseRow);
-      body.textContent = '';
-      if (!rows.length) {
-        body.append(h('tr', {}, h('td', { colspan: '6', class: 'muted', text: '아직 제출한 기록이 없어요.' })));
-        return;
-      }
-      for (const r of rows) {
-        body.append(h('tr', {},
-          h('td', {}, h('a', { href: `/source/${r.id}`, target: '_blank', text: r.id })),
-          h('td', {}, badge(r)),
-          h('td', { text: r.memory }), h('td', { text: r.time }),
-          h('td', { text: r.lang }), h('td', { class: 'muted', text: r.when })));
-      }
-    } catch {
-      body.textContent = '';
-      body.append(h('tr', {}, h('td', { colspan: '6', class: 'muted', text: '제출 기록을 불러오지 못했어요.' })));
+    saveDraft(false);
+    submitToken = Math.random().toString(36).slice(2);
+    // 팝업 차단을 피하려면 클릭 직후 바로 열어야 한다.
+    const w = window.open(`/submit/${PID}`, 'cboj-submit', 'popup,width=860,height=780');
+    if (!w) {
+      setCard('err', '제출 창이 차단됐어요', '주소창 오른쪽의 팝업 차단 아이콘을 눌러 이 사이트의 팝업을 허용해주세요.');
+      return;
     }
+    store.set('local', {
+      cbojPending: { pid: PID, langId: currentLang().id, langName: currentLang().name, code, codeOpen: settings.codeOpen, token: submitToken, at: Date.now() },
+      cbojJudge: null,
+    });
+    setCard('pending', '제출 창을 여는 중…', `${PID}번 · ${currentLang().name}`);
+    setStatus('제출 대기', 'busy');
+  }
+
+  function onJudge(j) {
+    if (!ui || !j || j.token !== submitToken) return;
+    if (j.stage === 'filled') {
+      const warn = j.langOk ? null
+        : h('div', { class: 'cboj-card-sub warn', text: `⚠ 제출 페이지 언어 목록에 ${j.langName || '선택한 언어'}가 없어요. 제출 창에서 언어를 직접 골라주세요.` });
+      setCard('pending', '제출 창에서 [제출]을 눌러주세요',
+        '코드와 언어를 채워 두었어요. 백준의 보안 확인(reCAPTCHA) 때문에 마지막 제출 버튼은 직접 눌러야 해요.', warn);
+      setStatus('제출 대기', 'busy');
+      return;
+    }
+    const done = j.stage === 'done';
+    setCard(done ? j.key : 'pending', '', '');
+    ui.card.firstChild.replaceWith(h('div', { class: 'cboj-card-title' }, badge(j)));
+    ui.card.append(h('div', { class: 'cboj-card-meta' },
+      j.id ? h('span', { text: `#${j.id}` }) : null,
+      j.memory ? h('span', { text: `메모리 ${j.memory}` }) : null,
+      j.time ? h('span', { text: `시간 ${j.time}` }) : null,
+      j.id ? h('a', { href: `/source/${j.id}`, target: '_blank', text: '코드 보기' }) : null));
+    setStatus(done ? j.text : '채점 중…', done ? (j.key === 'ac' ? 'ok' : 'err') : 'busy');
+  }
+
+  try {
+    ext.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.cbojJudge) onJudge(changes.cbojJudge.newValue);
+      if (area === 'local' && changes.cbojLangs && ui) adoptLanguages(changes.cbojLangs.newValue);
+    });
+  } catch { /* 무시 */ }
+
+  // 제출 페이지에서 본 언어 목록(사용자가 백준에서 고른 언어들)을 쓴다.
+  function adoptLanguages(list) {
+    const found = (list || []).filter((l) => l && l.id !== '' && langInfo(l.name));
+    if (!found.length) return;
+    const prevName = langs.length ? currentLang().name : null;
+    const order = (l) => ['cpp', 'c', 'py'].indexOf(langInfo(l.name).family);
+    langs = found.sort((a, b) => order(a) - order(b));
+    const same = langs.find((l) => l.name === prevName) || langs.find((l) => l.id === langId) || langs[0];
+    langId = same.id;
+    if (ui) renderLangs();
   }
 
   // ───────── 열고 닫기 ─────────
@@ -635,22 +496,12 @@
       const saved = await store.get('local', { cbojLayout: layout });
       layout = { ...layout, ...saved.cbojLayout };
       build();
+      const known = await store.get('local', { cbojLangs: null });
+      if (known.cbojLangs) adoptLanguages(known.cbojLangs);
       const last = await store.get('sync', { lastLangId: null, lastLangName: null });
       langId = (langs.find((l) => l.id === last.lastLangId) || langs.find((l) => l.name === last.lastLangName) || langs[0]).id;
       renderLangs();
       await loadDraft();
-      // 실제 제출 페이지에서 언어 번호·로그인 상태를 가져온다.
-      fetchSubmitPage().then((page) => {
-        submitInfo = page;
-        if (page.loggedIn && page.doc) {
-          const prevName = currentLang().name;
-          adoptLanguages(page.doc);
-          const same = langs.find((l) => l.name === prevName) || langs.find((l) => l.id === langId) || langs[0];
-          langId = same.id;
-          renderLangs();
-        }
-        loadHistory();
-      });
     }
     document.documentElement.classList.add('cboj-open');
     ui.panel.hidden = false;

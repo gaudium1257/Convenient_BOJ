@@ -1,0 +1,83 @@
+// Convenient BOJ — 제출 페이지 (확장 world)
+// 1) 사용자가 백준에서 고른 언어 목록을 저장해 분할 화면 언어 목록에 쓴다.
+// 2) 분할 화면의 [제출]로 열린 창이면, 작성한 코드·언어를 채우고 [제출] 버튼을 안내한다.
+(() => {
+  const m = /^\/submit\/(\d+)/.exec(location.pathname);
+  if (!m || globalThis.__cbojSubmitLoaded) return;
+  globalThis.__cbojSubmitLoaded = true;
+  const PID = m[1];
+  const ext = globalThis.__cbojChromeShim || globalThis.chrome;
+
+  const sel = document.querySelector('select[name="language"]');
+  if (sel) {
+    const langs = [...sel.options].filter((o) => o.value !== '').map((o) => ({ id: o.value, name: o.textContent.trim() }));
+    if (langs.length) ext.storage.local.set({ cbojLangs: langs });
+  }
+
+  function banner(kind, text) {
+    let el = document.getElementById('cboj-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'cboj-banner';
+      el.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483000;' +
+        'padding:10px 16px;border-radius:10px;font:600 14px/1.4 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;' +
+        'box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:90vw;text-align:center;';
+      document.body.appendChild(el);
+    }
+    el.style.background = kind === 'warn' ? '#FFF4E0' : '#E8F4FD';
+    el.style.color = kind === 'warn' ? '#8A4B00' : '#0B4F80';
+    el.style.border = '1px solid ' + (kind === 'warn' ? '#F5C27A' : '#9CCBF0');
+    el.textContent = text;
+  }
+
+  function submitButton() {
+    const form = document.getElementById('submit_form') || document;
+    return [...form.querySelectorAll('button, input[type="submit"]')]
+      .find((b) => b.offsetParent !== null && /제출/.test(b.textContent || b.value || ''));
+  }
+
+  function fill(p) {
+    let done = false;
+    const onMsg = (e) => {
+      if (e.source !== window || !e.data || e.data.cboj !== 'filled' || done) return;
+      done = true;
+      clearInterval(timer);
+      removeEventListener('message', onMsg);
+      const r = e.data;
+      ext.storage.local.set({
+        cbojWatch: { token: p.token, pid: PID, at: Date.now() },
+        cbojJudge: { token: p.token, stage: 'filled', langOk: r.langOk, langName: p.langName },
+      });
+      if (!r.ok) { banner('warn', 'Convenient BOJ: 코드를 넣지 못했어요. 클립보드에 복사해 두었으니 붙여넣어 주세요.'); navigator.clipboard?.writeText(p.code).catch(() => {}); return; }
+      banner(r.langOk ? 'info' : 'warn', r.langOk
+        ? 'Convenient BOJ: 코드를 채워 두었어요. 아래 [제출] 버튼을 눌러주세요. 결과는 분할 화면에 표시돼요.'
+        : `Convenient BOJ: 코드는 채웠지만 ${p.langName} 언어가 목록에 없어요. 언어를 직접 고른 뒤 [제출]을 눌러주세요.`);
+      const btn = submitButton();
+      if (btn) {
+        btn.scrollIntoView({ block: 'center' });
+        btn.style.boxShadow = '0 0 0 4px rgba(0,118,192,.35)';
+        btn.focus({ preventScroll: true });
+      }
+    };
+    addEventListener('message', onMsg);
+    const send = () => window.postMessage({ cboj: 'fill', code: p.code, langId: p.langId, codeOpen: p.codeOpen }, location.origin);
+    const timer = setInterval(send, 300);
+    send();
+    setTimeout(() => clearInterval(timer), 6000);
+  }
+
+  // 분할 화면이 연 창인지 확인 (창 이름 + 2분 안에 만든 제출 요청)
+  if (window.name !== 'cboj-submit') return;
+  let tries = 0;
+  const look = () => {
+    ext.storage.local.get({ cbojPending: null }, ({ cbojPending: p }) => {
+      if (p && p.pid === PID && Date.now() - p.at < 120000) {
+        ext.storage.local.remove('cbojPending');
+        fill(p);
+      } else if (++tries < 10) {
+        setTimeout(look, 300);
+      }
+    });
+  };
+  look();
+})();

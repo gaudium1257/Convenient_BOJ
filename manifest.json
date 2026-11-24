@@ -40,11 +40,44 @@
         "vendor/codemirror/matchbrackets.js",
         "vendor/codemirror/closebrackets.js",
         "shared/defaults.js",
+        "shared/boj.js",
         "content/split.js"
       ],
       "css": [
         "vendor/codemirror/codemirror.css",
         "content/split.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.acmicpc.net/submit/*",
+        "https://acmicpc.net/submit/*"
+      ],
+      "js": [
+        "content/submit-main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.acmicpc.net/submit/*",
+        "https://acmicpc.net/submit/*"
+      ],
+      "js": [
+        "content/submit.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.acmicpc.net/status*",
+        "https://acmicpc.net/status*"
+      ],
+      "js": [
+        "shared/boj.js",
+        "content/status.js"
       ],
       "run_at": "document_idle"
     }
