@@ -29,7 +29,7 @@ jobs:
       - name: ZIP 만들기
         run: |
           mkdir -p out/Convenient_BOJ
-          cp -r manifest.json background.js content popup shared icons vendor out/Convenient_BOJ/
+          cp -r manifest.json background.js content popup shared icons vendor host out/Convenient_BOJ/
           (cd out && zip -qr ../Convenient_BOJ.zip Convenient_BOJ)
           unzip -l Convenient_BOJ.zip
 
@@ -54,6 +54,9 @@ jobs:
           3. **압축해제된 확장 프로그램을 로드합니다** → 압축을 푼 `Convenient_BOJ` 폴더를 고릅니다.
 
           업데이트할 때는 새 ZIP을 받아 같은 폴더에 덮어쓰고, `chrome://extensions` 에서 새로고침(↻)을 누르면 됩니다.
+
+          ## 내 PC에서 실행 (진짜 터미널, 선택)
+          압축을 푼 폴더의 `host\install.bat` 을 더블클릭하고 묻는 대로 답하면 돼요. (Windows)
           NOTES
           )" \
             --generate-notes

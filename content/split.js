@@ -112,6 +112,7 @@
     const termIn = h('textarea', { class: 'cboj-term-in', placeholder: '직접 입력할 stdin', spellcheck: 'false' });
     const btnCustom = h('button', { class: 'cboj-btn run small', text: '이 입력으로 실행' });
     const btnClear = h('button', { class: 'cboj-link', text: '지우기' });
+    const where = h('button', { class: 'cboj-where', title: '코드를 실행하는 곳' });
     const paneTerm = h('div', { class: 'cboj-pane term' }, termOut,
       h('div', { class: 'cboj-term-bar' }, termIn, h('div', { class: 'cboj-term-actions' }, btnCustom, btnClear)));
 
@@ -128,7 +129,8 @@
       editor, resizerY, bottom);
     document.body.appendChild(panel);
 
-    ui = { panel, langSel, editor, bottom, card, termOut, termIn, status, tabResult, tabTerm, paneResult, paneTerm, btnRun, btnSubmit };
+    status.before(where);
+    ui = { panel, langSel, editor, bottom, card, termOut, termIn, status, tabResult, tabTerm, paneResult, paneTerm, btnRun, btnSubmit, btnCustom, where };
 
     cm = CM(editor, {
       value: '',
@@ -180,9 +182,11 @@
 
     langSel.addEventListener('change', async () => {
       await saveDraft(false);
+      if (live) stopLive();
       langId = langSel.value;
       store.set('sync', { lastLangId: langId, lastLangName: currentLang().name });
       await loadDraft();
+      renderRunner(); // 언어마다 내 PC 실행 가능 여부가 다를 수 있다 (C/C++은 gcc 필요)
     });
     btnReset.addEventListener('click', () => {
       if (cm.getValue().trim() && !confirm('작성한 코드를 지우고 기본 템플릿으로 되돌릴까요?')) return;
@@ -193,8 +197,12 @@
     btnClose.addEventListener('click', () => close());
     btnCustom.addEventListener('click', () => runCustom());
     btnClear.addEventListener('click', () => { termOut.textContent = ''; });
-    termIn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runCustom(); }
+    termIn.addEventListener('keydown', onTermKey);
+    where.addEventListener('click', () => {
+      if (runner.state === 'on') return;
+      checkRunner(true).then(() => {
+        if (runner.state !== 'on') window.open('https://github.com/gaudium1257/Convenient_BOJ#2단계-내-pc에서-실행-진짜-터미널-선택', '_blank');
+      });
     });
     [tabResult, tabTerm].forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
@@ -210,8 +218,10 @@
     });
 
     applySettings(settings);
-    termOut.append(line('info', '▶ 실행을 누르면 문제의 예제 입력으로 코드를 돌려보고 정답과 비교해요. (Ctrl+Enter)'));
-    termOut.append(line('dim', '코드는 Wandbox(wandbox.org) 서버에서 컴파일·실행돼요.'));
+    termOut.append(line('info', '▶ 실행: 문제의 예제 입력으로 돌려보고 정답과 비교해요. (Ctrl+Enter)'));
+    termOut.append(line('info', '아래 칸: 프로그램을 터미널에서 실행하고, 실행 중에 입력을 바로 보낼 수 있어요.'));
+    renderRunner();
+    checkRunner();
   }
 
   function dragResize(handle, onMove) {
@@ -393,12 +403,174 @@
     return '';
   }
 
+  // ───────── 내 PC 실행 도우미 (host/cboj_host.py) ─────────
+  // 설치돼 있으면 코드를 이 PC에서 컴파일·실행하고(진짜 터미널), 없으면 Wandbox로 실행한다.
+  const runner = { port: null, state: 'unknown', info: null, error: '', seq: 0, handlers: new Map(), waiters: [] };
+
+  function runnerPort() {
+    if (runner.port) return runner.port;
+    try {
+      runner.port = ext.runtime.connect({ name: 'cboj-runner' });
+    } catch {
+      runner.state = 'off';
+      return null;
+    }
+    runner.port.onMessage.addListener(onRunnerMessage);
+    runner.port.onDisconnect.addListener(() => {
+      runner.port = null;
+      failRunnerJobs('확장 프로그램과 연결이 끊겼어요. 페이지를 새로고침 해주세요.');
+    });
+    return runner.port;
+  }
+
+  function onRunnerMessage(m) {
+    if (!m) return;
+    if (m.type === 'info') {
+      runner.state = 'on';
+      runner.info = m;
+      settleRunnerWaiters();
+      return;
+    }
+    if (m.type === 'nohost') {
+      runner.state = 'off';
+      runner.error = m.error || '';
+      settleRunnerWaiters();
+      failRunnerJobs('내 PC 실행 도우미와 연결이 끊겼어요.');
+      return;
+    }
+    const handler = runner.handlers.get(m.id);
+    if (handler) handler(m);
+  }
+
+  function settleRunnerWaiters() {
+    const ws = runner.waiters.splice(0);
+    ws.forEach((w) => w());
+    renderRunner();
+  }
+
+  function failRunnerJobs(message) {
+    for (const [id, handler] of [...runner.handlers]) handler({ id, type: 'lost', message });
+    runner.handlers.clear();
+  }
+
+  // 도우미가 있는지 확인한다. force면 다시 확인한다(설치 직후 등).
+  function checkRunner(force) {
+    if (!force && runner.state !== 'unknown') return Promise.resolve(runner.state === 'on');
+    runner.state = 'unknown';
+    renderRunner();
+    return new Promise((resolve) => {
+      runner.waiters.push(() => resolve(runner.state === 'on'));
+      const port = runnerPort();
+      if (!port) { settleRunnerWaiters(); return; }
+      port.postMessage({ type: 'info' });
+      setTimeout(() => {
+        if (runner.state === 'unknown') { runner.state = 'off'; runner.error = '응답 없음'; settleRunnerWaiters(); }
+      }, 4000);
+    });
+  }
+
+  // 지금 언어를 이 PC에서 실행할 수 있는지
+  function localReady() {
+    if (runner.state !== 'on' || !runner.info) return false;
+    const kind = currentInfo().kind;
+    if (kind === 'python') return true;
+    return kind === 'c' ? !!runner.info.gcc : !!runner.info.gpp;
+  }
+  async function useLocal() {
+    await checkRunner();
+    return localReady();
+  }
+
+  function hostRequest(msg, endType) {
+    return new Promise((resolve) => {
+      const port = runnerPort();
+      if (!port) { resolve({ type: 'lost', message: '도우미에 연결하지 못했어요.' }); return; }
+      const id = ++runner.seq;
+      runner.handlers.set(id, (m) => {
+        if (m.type === endType || m.type === 'lost') { runner.handlers.delete(id); resolve(m); }
+      });
+      port.postMessage({ ...msg, id });
+    });
+  }
+
+  function renderRunner() {
+    if (!ui) return;
+    const w = ui.where;
+    const kind = currentInfo().kind;
+    let text, cls, title;
+    if (runner.state === 'unknown') {
+      text = '실행 위치 확인 중…'; cls = ''; title = '';
+    } else if (localReady()) {
+      const tool = kind === 'python' ? `Python ${runner.info.python}` : (kind === 'c' ? runner.info.gcc : runner.info.gpp);
+      text = '● 내 PC'; cls = 'local';
+      title = `내 PC에서 실행해요 (${tool}). 아래 칸에서 터미널처럼 입력을 주고받을 수 있어요.`;
+    } else if (runner.state === 'on') {
+      text = '● Wandbox (gcc 없음)'; cls = 'remote';
+      title = '내 PC에 gcc/g++가 없어서 C/C++은 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 gcc를 설치할 수 있어요.';
+    } else {
+      text = '● Wandbox'; cls = 'remote';
+      title = '내 PC 실행 도우미가 설치되지 않아 Wandbox(온라인)에서 실행해요. 누르면 다시 확인하고, 그래도 없으면 설치 방법을 열어요.';
+    }
+    w.textContent = text;
+    w.className = 'cboj-where ' + cls;
+    w.title = title;
+    if (!live) {
+      const local = localReady();
+      ui.btnCustom.textContent = local ? '▶ 터미널에서 실행' : '이 입력으로 실행';
+      ui.termIn.placeholder = local
+        ? '실행 전에 미리 넣을 입력 (비워 두고 실행한 뒤 입력해도 돼요)'
+        : '직접 입력할 stdin';
+    }
+  }
+
+  // ───────── 예제 실행 (입력을 미리 정해 두고 한꺼번에) ─────────
+  async function runInputs(inputs) {
+    const info = currentInfo();
+    const code = cm.getValue();
+    if (await useLocal()) {
+      const r = await hostRequest({ type: 'batch', lang: info, code, inputs, timeLimit: 10 }, 'batch-result');
+      if (r.type === 'lost') return { fatal: r.message };
+      if (r.error) {
+        if (r.error.code === 'compile') return { where: '내 PC', cmd: r.cmd && '$ ' + r.cmd, compileError: r.error.message };
+        return { fatal: r.error.message };
+      }
+      const nl = (s) => String(s || '').replace(/\r\n/g, '\n');
+      return {
+        where: '내 PC',
+        cmd: '$ ' + r.cmd,
+        warnings: r.warnings,
+        results: r.results.map((x) => ({
+          stdout: nl(x.stdout),
+          stderr: nl(x.stderr),
+          ms: x.ms,
+          note: x.timeout ? '시간 초과 (10초)' : (x.code ? `${x.note || '런타임 에러'} (종료 코드 ${x.code})` : ''),
+        })),
+      };
+    }
+    // Wandbox: 첫 입력으로 컴파일 에러를 확인하고 나머지는 동시에
+    const first = await execute(inputs[0]);
+    if (!first.ok) return { fatal: first.error };
+    if (first.compileError && first.status !== '0' && /\berror\b/.test(first.compileError) && !first.stdout) {
+      return { where: 'Wandbox', cmd: commandLine(first, info), compileError: first.compileError };
+    }
+    const rest = await Promise.all(inputs.slice(1).map((s) => execute(s)));
+    return {
+      where: 'Wandbox',
+      cmd: commandLine(first, info),
+      warnings: /warning/i.test(first.compileError || '') ? first.compileError : '',
+      results: [first, ...rest].map((r) => (r.ok
+        ? { stdout: r.stdout, stderr: r.stderr, note: runtimeNote(r) }
+        : { stdout: '', stderr: '', note: r.error })),
+    };
+  }
+
   async function runSamples() {
     if (running) return;
+    if (live) stopLive();
     const list = samples();
     if (!list.length) {
       showTab('term');
-      termAppend(line('warn', '이 문제에는 예제가 없어요. 아래 칸에 입력을 넣고 "이 입력으로 실행"을 눌러주세요.'));
+      termAppend(line('warn', '이 문제에는 예제가 없어요. 아래 칸에서 직접 실행해 주세요.'));
       ui.termIn.focus();
       return;
     }
@@ -406,51 +578,41 @@
     ui.btnRun.disabled = true;
     showTab('term');
     saveDraft(false);
-    const info = currentInfo();
     ui.termOut.textContent = '';
     termAppend(line('info', `${currentLang().name} · 예제 ${list.length}개 실행 중…`));
     setStatus('실행 중…', 'busy');
 
-    let passed = 0, judged = 0, shownCmd = false, failed = false;
-    const results = new Array(list.length);
-    const runOne = async (i) => { results[i] = await execute(list[i].input); };
-
-    // 첫 예제로 컴파일 에러를 먼저 확인하고, 나머지는 동시에 돌린다.
-    await runOne(0);
-    if (!showRunFailure(results[0])) {
-      const rest = [];
-      for (let i = 1; i < list.length; i++) rest.push(runOne(i));
-      await Promise.all(rest);
+    const out = await runInputs(list.map((s) => s.input));
+    if (out.fatal) {
+      termAppend(line('err', '✘ ' + out.fatal));
+      setStatus('실행 실패', 'err');
+    } else if (out.compileError != null) {
+      if (out.cmd) termAppend(line('cmd', `${out.cmd}   [${out.where}]`));
+      termAppend(line('err', '✘ 컴파일 에러'), block('컴파일러 메시지', out.compileError.trimEnd(), 'err'));
+      setStatus('컴파일 에러', 'err');
     } else {
-      failed = true;
-    }
-
-    if (!failed) {
+      termAppend(line('cmd', `${out.cmd}   [${out.where}]`));
+      if (out.warnings) termAppend(block('컴파일 경고', out.warnings.trimEnd(), 'dim'));
+      let passed = 0, judged = 0;
       list.forEach((s, i) => {
-        const res = results[i];
-        if (!shownCmd && res.ok) { termAppend(line('cmd', commandLine(res, info))); shownCmd = true; }
-        if (!res.ok) { termAppend(line('err', `✘ 예제 ${s.n}: ${res.error}`)); return; }
-        const note = runtimeNote(res);
+        const res = out.results[i] || { stdout: '', stderr: '', note: '결과 없음' };
         let verdict, kind;
         if (s.expected == null) { verdict = '출력 확인 필요'; kind = 'warn'; }
         else {
           judged++;
-          const ok = normalize(res.stdout) === normalize(s.expected) && !res.signal;
+          const ok = !res.note && normalize(res.stdout) === normalize(s.expected);
           if (ok) { passed++; verdict = SPJ ? '맞음 (스페셜 저지: 참고용)' : '맞음'; kind = 'ok'; }
-          else { verdict = note || '틀림'; kind = 'err'; }
+          else { verdict = res.note || '틀림'; kind = 'err'; }
         }
-        termAppend(line(kind, `${kind === 'ok' ? '✔' : kind === 'err' ? '✘' : '•'} 예제 ${s.n} — ${verdict}`));
+        const time = res.ms != null ? `  (${(res.ms / 1000).toFixed(2)}초)` : '';
+        termAppend(line(kind, `${kind === 'ok' ? '✔' : kind === 'err' ? '✘' : '•'} 예제 ${s.n} — ${verdict}${time}`));
         if (kind !== 'ok') {
-          const grid = h('div', { class: 'tgrid' },
+          termAppend(h('div', { class: 'tgrid' },
             block('입력', s.input.replace(/\n$/, '')),
             s.expected != null ? block('기대 출력', s.expected.replace(/\n$/, '')) : null,
-            block('내 출력', res.stdout.replace(/\n$/, ''), kind === 'err' ? 'err' : ''));
-          termAppend(grid);
+            block('내 출력', res.stdout.replace(/\n$/, ''), kind === 'err' ? 'err' : '')));
         }
         if (res.stderr) termAppend(block('stderr', res.stderr.trimEnd(), 'dim'));
-        if (res.compileError && /warning/i.test(res.compileError) && i === 0) {
-          termAppend(block('컴파일 경고', res.compileError.trimEnd(), 'dim'));
-        }
       });
       if (judged) {
         const all = passed === judged;
@@ -461,21 +623,25 @@
       } else {
         setStatus('실행 완료', '');
       }
-    } else {
-      setStatus('컴파일 에러', 'err');
     }
     running = false;
     ui.btnRun.disabled = false;
   }
 
+  // ───────── 직접 실행 ─────────
+  // 내 PC: 진짜 터미널처럼 실행 중에 입력을 주고받는다.  Wandbox: 입력을 한꺼번에 넣고 결과만 받는다.
+  let live = null; // { id, pre, pendingEcho }
+
   async function runCustom() {
+    if (live) { stopLive(); return; }
     if (running) return;
+    if (await useLocal()) { startLive(); return; }
     running = true;
     showTab('term');
     saveDraft(false);
     const info = currentInfo();
     const stdin = ui.termIn.value;
-    termAppend(line('info', `${currentLang().name} · 직접 입력으로 실행 중…`));
+    termAppend(line('info', `${currentLang().name} · 직접 입력으로 실행 중… [Wandbox]`));
     setStatus('실행 중…', 'busy');
     const res = await execute(stdin);
     if (!showRunFailure(res)) {
@@ -489,6 +655,109 @@
       setStatus('컴파일 에러', 'err');
     }
     running = false;
+  }
+
+  function startLive() {
+    const port = runnerPort();
+    if (!port) return;
+    showTab('term');
+    saveDraft(false);
+    const id = ++runner.seq;
+    const initial = ui.termIn.value;
+    ui.termIn.value = '';
+    live = { id, pre: h('pre', { class: 'tlive' }), pendingEcho: initial ? withNewline(initial) : '' };
+    termAppend(line('info', `${currentLang().name} · 터미널에서 실행 [내 PC]`));
+    setLiveUI(true);
+    setStatus('컴파일 중…', 'busy');
+    runner.handlers.set(id, onLive);
+    port.postMessage({ type: 'run', id, lang: currentInfo(), code: cm.getValue(), stdin: live.pendingEcho, interactive: true });
+  }
+
+  function withNewline(s) { return s.endsWith('\n') ? s : s + '\n'; }
+
+  function onLive(m) {
+    if (!live || m.id !== live.id) return;
+    if (m.type === 'compiled') {
+      if (!m.ok) {
+        if (m.cmd) termAppend(line('cmd', '$ ' + m.cmd));
+        if (m.code === 'nocompiler') termAppend(line('err', `✘ ${m.message} 도우미 설치 스크립트(install.bat)를 다시 실행하면 설치할 수 있어요.`));
+        else termAppend(line('err', '✘ 컴파일 에러'), block('컴파일러 메시지', String(m.message || '').trimEnd(), 'err'));
+        return;
+      }
+      termAppend(line('cmd', '$ ' + m.cmd));
+      if (m.warnings) termAppend(block('컴파일 경고', m.warnings.trimEnd(), 'dim'));
+      termAppend(live.pre);
+    } else if (m.type === 'start') {
+      setStatus('● 실행 중', 'busy');
+      if (live.pendingEcho) appendLive(live.pendingEcho, 'in');
+      ui.termIn.focus();
+    } else if (m.type === 'out') {
+      appendLive(String(m.data).replace(/\r\n/g, '\n'), m.stream === 'stderr' ? 'err' : '');
+    } else if (m.type === 'error') {
+      termAppend(line('err', '✘ ' + m.message));
+    } else if (m.type === 'exit' || m.type === 'lost') {
+      runner.handlers.delete(m.id);
+      if (m.type === 'lost') { termAppend(line('err', '✘ ' + m.message)); setStatus('실행 실패', 'err'); }
+      else if (m.compileFailed) setStatus('컴파일 에러', 'err');
+      else if (m.overLimit) { termAppend(line('err', '■ 출력이 너무 많아서 중지했어요.')); setStatus('중지됨', 'err'); }
+      else if (m.killed) { termAppend(line('warn', '■ 중지했어요.')); setStatus('중지됨', ''); }
+      else if (m.code === 0) { termAppend(line('dim', `정상 종료 (${(m.ms / 1000).toFixed(2)}초)`)); setStatus('실행 완료', 'ok'); }
+      else { termAppend(line('err', `✘ ${m.note || '런타임 에러'} (종료 코드 ${m.code})`)); setStatus('런타임 에러', 'err'); }
+      live = null;
+      setLiveUI(false);
+    }
+  }
+
+  function appendLive(text, cls) {
+    if (!live || !text) return;
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.textContent = text;
+    live.pre.append(span);
+    ui.termOut.scrollTop = ui.termOut.scrollHeight;
+  }
+
+  function sendLive(text) {
+    if (!live || !runner.port) return;
+    runner.port.postMessage({ type: 'stdin', id: live.id, data: text });
+    appendLive(text, 'in');
+  }
+
+  function stopLive() {
+    if (live && runner.port) runner.port.postMessage({ type: 'kill', id: live.id });
+  }
+
+  function setLiveUI(on) {
+    ui.btnCustom.classList.toggle('stop', on);
+    ui.termIn.classList.toggle('live', on);
+    if (on) {
+      ui.btnCustom.textContent = '■ 중지';
+      ui.termIn.placeholder = '입력하고 Enter  ·  Shift+Enter 줄바꿈  ·  Ctrl+C 중지  ·  Ctrl+D 입력 끝';
+    } else {
+      renderRunner();
+    }
+  }
+
+  function onTermKey(e) {
+    if (live) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        const v = ui.termIn.value;
+        ui.termIn.value = '';
+        sendLive(v + '\n');
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C') && ui.termIn.selectionStart === ui.termIn.selectionEnd) {
+        e.preventDefault();
+        stopLive();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        if (ui.termIn.value) sendLive(ui.termIn.value);
+        ui.termIn.value = '';
+        if (runner.port) runner.port.postMessage({ type: 'eof', id: live.id });
+        appendLive('^D\n', 'dim');
+      }
+      return;
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runCustom(); }
   }
 
   // ───────── 백준 제출 ─────────
@@ -614,6 +883,7 @@
     if (!isOpen) return;
     isOpen = false;
     saveDraft(false);
+    if (live) stopLive();
     document.documentElement.classList.remove('cboj-open');
     ui.panel.hidden = true;
     toggleBtn.classList.remove('active');

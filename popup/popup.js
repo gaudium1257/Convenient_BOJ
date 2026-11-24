@@ -112,6 +112,27 @@
     if (await saveTemplate(TEMPLATES[lang])) showState('saved');
   });
 
+  // ───────── 실행 위치 (내 PC 실행 도우미) ─────────
+  const runnerState = document.getElementById('runnerState');
+  const GUIDE = 'https://github.com/gaudium1257/Convenient_BOJ#2단계-내-pc에서-실행-진짜-터미널-선택';
+  function showRunner(info) {
+    runnerState.textContent = '';
+    if (info) {
+      const parts = [`Python ${info.python}`, info.gpp ? 'g++ ✔' : 'g++ 없음'];
+      runnerState.className = 'runner-state on';
+      runnerState.append('● 내 PC', Object.assign(document.createElement('small'), { textContent: parts.join(' · ') }));
+    } else {
+      runnerState.className = 'runner-state off';
+      const a = Object.assign(document.createElement('a'), { href: GUIDE, target: '_blank', textContent: '설치 방법' });
+      runnerState.append('● Wandbox (온라인)', a);
+    }
+  }
+  try {
+    ext.runtime.sendNativeMessage('com.convenient_boj.runner', { type: 'info' }, (res) => {
+      showRunner(!ext.runtime.lastError && res && res.type === 'info' ? res : null);
+    });
+  } catch { showRunner(null); }
+
   if (ext) ext.storage.sync.get(DEFAULTS, (v) => { s = { ...DEFAULTS, ...v }; render(); showTemplate(); });
   render();
   showTemplate();

@@ -163,6 +163,46 @@ chrome.windows.onRemoved.addListener(async (winId) => {
   chrome.storage.local.set({ cbojJudge: { token: s.token, stage: s.submitted ? 'closed' : 'cancelled' } });
 });
 
+// ───────── 내 PC 실행 도우미 연결 ─────────
+// 분할 화면(콘텐츠 스크립트)과 PC 도우미(host/cboj_host.py) 사이에서 메시지를 그대로 전달한다.
+// 도우미가 설치되지 않았으면 'nohost'를 보내고, 분할 화면은 Wandbox로 실행한다.
+const HOST_NAME = 'com.convenient_boj.runner';
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'cboj-runner') return;
+  let native = null;
+  let closed = false;
+
+  const open = () => {
+    if (native) return native;
+    try {
+      native = chrome.runtime.connectNative(HOST_NAME);
+    } catch (e) {
+      port.postMessage({ type: 'nohost', error: String(e && e.message || e) });
+      return null;
+    }
+    native.onMessage.addListener((m) => { try { port.postMessage(m); } catch { /* 탭이 닫힘 */ } });
+    native.onDisconnect.addListener(() => {
+      const err = chrome.runtime.lastError && chrome.runtime.lastError.message;
+      native = null;
+      if (!closed) { try { port.postMessage({ type: 'nohost', error: err || '도우미 연결이 끊겼어요.' }); } catch { /* 탭이 닫힘 */ } }
+    });
+    return native;
+  };
+
+  port.onMessage.addListener((m) => {
+    const n = open();
+    if (n) n.postMessage(m);
+  });
+  port.onDisconnect.addListener(() => {
+    closed = true;
+    if (native) {
+      try { native.disconnect(); } catch { /* 이미 끊김 */ }
+      native = null;
+    }
+  });
+});
+
 const HANDLERS = {
   'cboj:run': (msg) => run(msg),
   'cboj:open-submit': openSubmit,
