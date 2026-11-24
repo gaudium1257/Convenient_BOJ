@@ -195,6 +195,9 @@ chrome.runtime.onConnect.addListener((port) => {
     if (n) n.postMessage(m);
   });
   port.onDisconnect.addListener(() => {
+    // 탭이 닫히거나 뒤로 가기 캐시(bfcache)로 들어가면 크롬이 연결을 닫는다.
+    // 이유(lastError)를 읽어 두지 않으면 'Unchecked runtime.lastError'로 오류 목록에 쌓인다.
+    void chrome.runtime.lastError;
     closed = true;
     if (native) {
       try { native.disconnect(); } catch { /* 이미 끊김 */ }

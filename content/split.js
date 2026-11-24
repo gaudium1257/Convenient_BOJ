@@ -417,6 +417,8 @@
     }
     runner.port.onMessage.addListener(onRunnerMessage);
     runner.port.onDisconnect.addListener(() => {
+      // 페이지가 뒤로 가기 캐시에 들어가거나 확장이 다시 시작되면 끊긴다. 다음에 쓸 때 새로 연결한다.
+      try { void ext.runtime.lastError; } catch { /* 확장이 다시 로드됨 */ }
       runner.port = null;
       failRunnerJobs('확장 프로그램과 연결이 끊겼어요. 페이지를 새로고침 해주세요.');
     });
