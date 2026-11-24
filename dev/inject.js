@@ -27,6 +27,12 @@
         setTimeout(() => { listeners.forEach((l) => l(changes, name)); cb && cb(); });
         return Promise.resolve();
       },
+      remove(key) {
+        const cur = read();
+        delete cur[key];
+        localStorage.setItem(KEY, JSON.stringify(cur));
+        return Promise.resolve();
+      },
     };
   };
   async function run({ lang, code, stdin }) {

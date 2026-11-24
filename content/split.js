@@ -235,7 +235,16 @@
   async function saveDraft(notify) {
     if (!cm) return;
     const info = currentInfo();
-    store.set('local', { [draftKey(info.family)]: { code: cm.getValue(), at: Date.now() } });
+    const key = draftKey(info.family);
+    const code = cm.getValue();
+    if (code === templateFor(info.family).code) {
+      // 손대지 않은 기본 코드는 저장하지 않는다.
+      // 그래야 다음에 열 때도 기본 코드와 $0 커서 위치가 그대로 쓰이고, 팝업에서 바꾼 기본 코드도 반영된다.
+      try { ext.storage.local.remove(key); } catch { /* 확장이 다시 로드됨 */ }
+    } else {
+      const { line, ch } = cm.getCursor();
+      store.set('local', { [key]: { code, cursor: { line, ch }, at: Date.now() } });
+    }
     if (notify) setStatus('저장했어요', 'ok');
   }
   async function loadDraft() {
@@ -243,18 +252,25 @@
     cm.setOption('mode', info.mode);
     const key = draftKey(info.family);
     const v = await store.get('local', { [key]: null });
-    if (v[key] && typeof v[key].code === 'string') {
-      cm.setValue(v[key].code);
+    const d = v[key];
+    if (d && typeof d.code === 'string' && d.code !== templateFor(info.family).code) {
+      cm.setValue(d.code);
       cm.clearHistory();
+      // 마지막으로 작업하던 자리로 커서를 돌려놓는다 (예전 저장본은 코드 끝으로).
+      const last = cm.lastLine();
+      if (d.cursor && d.cursor.line <= last) cm.setCursor(d.cursor);
+      else cm.setCursor(last, cm.getLine(last).length);
     } else {
       setTemplate();
     }
   }
-  function setTemplate() {
-    const info = currentInfo();
+  function templateFor(family) {
     // 팝업에서 바꾼 기본 코드가 있으면 그걸, 없으면 기본값을 쓴다.
-    const custom = settings.templates && settings.templates[info.family];
-    const t = expandTemplate(typeof custom === 'string' ? custom : TEMPLATES[info.family]);
+    const custom = settings.templates && settings.templates[family];
+    return expandTemplate(typeof custom === 'string' ? custom : TEMPLATES[family]);
+  }
+  function setTemplate() {
+    const t = templateFor(currentInfo().family);
     cm.setValue(t.code);
     cm.clearHistory();
     if (t.line != null) cm.setCursor({ line: t.line, ch: t.ch });
