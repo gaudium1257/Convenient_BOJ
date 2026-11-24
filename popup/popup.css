@@ -65,3 +65,23 @@ h2 { margin: 0; font-size: 13px; font-weight: 700; }
 .keys dt { font-family: Consolas, monospace; color: var(--ink); background: #EEF1F4; border-radius: 5px; padding: 0 6px; }
 .keys dd { margin: 0; color: var(--muted); }
 .note { margin: 6px 2px 0; color: var(--muted); font-size: 11px; }
+
+/* 기본 코드 */
+.tpl { padding: 6px 12px 10px; }
+.tpl textarea {
+  display: block; width: 100%; height: 150px; margin: 4px 0 6px; resize: vertical;
+  font: 12px/1.5 "D2Coding", "JetBrains Mono", Consolas, monospace; color: var(--ink);
+  background: #FAFBFC; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
+  white-space: pre; overflow: auto; tab-size: 4;
+}
+.tpl textarea:focus { outline: none; border-color: var(--accent); background: #fff; }
+.tpl-bar { display: flex; align-items: center; gap: 6px; }
+
+.tpl code { font-family: Consolas, monospace; background: #EEF1F4; border-radius: 4px; padding: 0 3px; }
+.tpl-state { font-size: 11px; color: var(--muted); flex: 1; }
+.tpl-state.dirty { color: #E67700; font-weight: 600; }
+.tpl-state.saved { color: #2B9348; font-weight: 600; }
+.mini { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 3px 9px; font-size: 12px; }
+.mini:hover { border-color: #B8C0C8; }
+.mini.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.hint { margin: 6px 0 0; color: var(--muted); font-size: 11px; }

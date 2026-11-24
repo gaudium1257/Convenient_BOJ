@@ -36,6 +36,22 @@
     </div>
   </section>
 
+  <section class="card tpl">
+    <div class="row">
+      <h2>기본 코드</h2>
+      <div class="seg" id="tplLang">
+        <button data-lang="cpp">C++</button><button data-lang="c">C</button><button data-lang="py">Python</button>
+      </div>
+    </div>
+    <textarea id="tplText" spellcheck="false" placeholder="(비어 있음: 빈 화면에서 시작해요)"></textarea>
+    <div class="tpl-bar">
+      <span class="tpl-state" id="tplState"></span>
+      <button class="mini" id="tplReset" title="이 언어의 기본 코드를 처음 상태로">기본값</button>
+      <button class="mini primary" id="tplSave">저장</button>
+    </div>
+    <p class="hint"><code>$0</code> 자리에 커서가 놓여요. 새 문제를 처음 열 때와 [↺ 초기화]를 누를 때 쓰이고, 이미 작성한 코드는 바뀌지 않아요.</p>
+  </section>
+
   <section class="card keys">
     <h2>단축키</h2>
     <dl>

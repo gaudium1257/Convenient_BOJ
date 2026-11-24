@@ -17,12 +17,8 @@
     { id: '75', name: 'C11' }, { id: '0', name: 'C99' },
     { id: '28', name: 'Python 3' }, { id: '73', name: 'PyPy3' },
   ];
-  const TEMPLATES = {
-    c: '#include <stdio.h>\n\nint main(void) {\n    \n    return 0;\n}\n',
-    cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n\n    \n    return 0;\n}\n',
-    py: 'import sys\ninput = sys.stdin.readline\n\n',
-  };
-  const TEMPLATE_CURSOR = { c: { line: 3, ch: 4 }, cpp: { line: 7, ch: 4 }, py: { line: 3, ch: 0 } };
+  const TEMPLATES = globalThis.CBOJ_TEMPLATES;
+  const expandTemplate = globalThis.cbojExpandTemplate;
 
   function langInfo(name) {
     if (/^(Python 3|PyPy3)/.test(name)) return { kind: 'python', family: 'py', mode: 'text/x-python' };
@@ -256,9 +252,13 @@
   }
   function setTemplate() {
     const info = currentInfo();
-    cm.setValue(TEMPLATES[info.family]);
+    // 팝업에서 바꾼 기본 코드가 있으면 그걸, 없으면 기본값을 쓴다.
+    const custom = settings.templates && settings.templates[info.family];
+    const t = expandTemplate(typeof custom === 'string' ? custom : TEMPLATES[info.family]);
+    cm.setValue(t.code);
     cm.clearHistory();
-    cm.setCursor(TEMPLATE_CURSOR[info.family]);
+    if (t.line != null) cm.setCursor({ line: t.line, ch: t.ch });
+    else cm.setCursor(cm.lastLine(), cm.getLine(cm.lastLine()).length);
     cm.focus();
   }
 
