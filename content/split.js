@@ -505,7 +505,7 @@
       text = '● 내 PC'; cls = 'local';
       title = `내 PC에서 실행해요 (${tool}). 아래 칸에서 터미널처럼 입력을 주고받을 수 있어요.`;
     } else if (runner.state === 'on') {
-      text = '● Wandbox (gcc 없음)'; cls = 'remote';
+      text = '● Wandbox (C/C++ 컴파일러 없음)'; cls = 'remote';
       title = '내 PC에 gcc/g++가 없어서 C/C++은 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 gcc를 설치할 수 있어요.';
     } else {
       text = '● Wandbox'; cls = 'remote';

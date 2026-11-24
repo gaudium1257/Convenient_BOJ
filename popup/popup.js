@@ -118,7 +118,12 @@
   function showRunner(info) {
     runnerState.textContent = '';
     if (info) {
-      const parts = [`Python ${info.python}`, info.gpp ? 'g++ ✔' : 'g++ 없음'];
+      // gcc(C)와 g++(C++)는 보통 함께 설치되므로 'C/C++'로 묶어 보여 준다
+      const cpp = info.gcc && info.gpp ? 'C/C++ ✔'
+        : info.gcc ? 'C ✔ · C++ 없음'
+          : info.gpp ? 'C++ ✔ · C 없음'
+            : 'C/C++ 없음';
+      const parts = [`Python ${info.python}`, cpp];
       runnerState.className = 'runner-state on';
       runnerState.append('● 내 PC', Object.assign(document.createElement('small'), { textContent: parts.join(' · ') }));
     } else {
