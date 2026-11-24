@@ -34,6 +34,6 @@ globalThis.cbojParseRow = (tr) => {
     key: globalThis.cbojResultKey(span, text),
     memory: mem ? (/^\d+$/.test(mem) ? mem + ' KB' : mem) : '',
     time: time ? (/^\d+$/.test(time) ? time + ' ms' : time) : '',
-    lang: txt(td[langIdx]),
+    lang: txt(td[langIdx]).replace(/\s*\/\s*수정$/, ''),
   };
 };

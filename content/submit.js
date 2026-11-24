@@ -19,7 +19,7 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'cboj-banner';
-      el.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:2147483000;' +
+      el.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:2147483000;' +
         'padding:10px 16px;border-radius:10px;font:600 14px/1.4 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;' +
         'box-shadow:0 6px 20px rgba(0,0,0,.18);max-width:90vw;text-align:center;';
       document.body.appendChild(el);

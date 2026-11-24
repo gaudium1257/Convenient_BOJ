@@ -45,7 +45,7 @@
     observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
     // 실시간 갱신이 멈춘 것처럼 보이면 페이지를 다시 불러온다.
     const fallback = setInterval(() => {
-      if (Date.now() - lastChange > 8000) location.reload();
+      if (Date.now() - lastChange > 6000) location.reload();
     }, 2000);
     tick();
   });
