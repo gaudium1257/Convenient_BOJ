@@ -50,15 +50,25 @@
 - 코드 공개 설정은 팝업에서 고를 수 있어요(기본값: 백준 설정을 따름).
 - 제출 창이 열리지 않으면 주소창 오른쪽의 팝업 차단 아이콘에서 acmicpc.net 팝업을 허용해 주세요.
 
-## 설치 (개발자 모드)
+## 설치
 
-1. 이 저장소를 받습니다. `git clone https://github.com/gaudium1257/Convenient_BOJ.git`
-2. 크롬에서 `chrome://extensions` 를 엽니다.
+1. [Releases](https://github.com/gaudium1257/Convenient_BOJ/releases/latest)에서 **Convenient_BOJ.zip** 을 내려받아 압축을 풉니다.
+2. 크롬 주소창에 `chrome://extensions` 를 입력합니다.
 3. 오른쪽 위 **개발자 모드**를 켭니다.
-4. **압축해제된 확장 프로그램을 로드합니다** → 받은 `Convenient_BOJ` 폴더를 고릅니다.
+4. **압축해제된 확장 프로그램을 로드합니다** → 압축을 푼 `Convenient_BOJ` 폴더를 고릅니다.
 5. 백준 문제 페이지를 새로고침하면 끝!
 
-코드를 고친 뒤에는 `chrome://extensions` 에서 새로고침(↻) 버튼을 누르고 백준 탭도 새로고침해 주세요.
+> 압축을 푼 폴더는 지우지 마세요. 크롬이 그 폴더에서 확장을 읽어요.
+
+### 업데이트
+새 ZIP을 받아 같은 폴더에 덮어쓴 뒤, `chrome://extensions` 에서 Convenient BOJ의 새로고침(↻)을 누르고 백준 탭도 새로고침해 주세요.
+
+### 새 버전 배포하기 (개발자용)
+`manifest.json` 의 `version` 을 올리고 같은 번호로 태그를 올리면, GitHub Actions가 ZIP을 만들어 Releases에 올려요.
+
+```powershell
+git tag v1.0.1; git push origin v1.0.1
+```
 
 ## 단축키
 
@@ -92,4 +102,5 @@ shared/boj.js            채점 결과 읽기
 vendor/codemirror/       CodeMirror 5 (MIT)
 docs/screenshots/        실제 동작 캡처
 dev/inject.js            개발용 테스트 로더 (확장에는 쓰이지 않음)
+.github/workflows/       태그를 올리면 Releases에 ZIP 배포
 ```
