@@ -5,7 +5,7 @@
 (() => {
   if (globalThis.__cbojStatusLoaded) return;
   globalThis.__cbojStatusLoaded = true;
-  const ext = globalThis.__cbojChromeShim || globalThis.chrome;
+  const ext = globalThis.chrome;
   const FINAL = globalThis.CBOJ_FINAL;
   const parseRow = globalThis.cbojParseRow;
   const send = (msg) => Promise.resolve(ext.runtime.sendMessage(msg)).catch(() => ({}));

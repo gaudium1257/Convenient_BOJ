@@ -1,9 +1,7 @@
 // Convenient BOJ — 팝업 설정 화면
 (() => {
   'use strict';
-  const ext = (globalThis.chrome && chrome.storage)
-    ? chrome
-    : (window.parent !== window && window.parent.__cbojChromeShim);
+  const ext = globalThis.chrome;
   const DEFAULTS = globalThis.CBOJ_DEFAULTS;
   const TEMPLATES = globalThis.CBOJ_TEMPLATES;
   let s = { ...DEFAULTS };

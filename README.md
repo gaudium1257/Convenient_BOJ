@@ -109,6 +109,5 @@ shared/defaults.js       공통 기본 설정
 shared/boj.js            채점 결과 읽기
 vendor/codemirror/       CodeMirror 5 (MIT)
 docs/screenshots/        실제 동작 캡처
-dev/inject.js            개발용 테스트 로더 (확장에는 쓰이지 않음)
 .github/workflows/       태그를 올리면 Releases에 ZIP 배포
 ```

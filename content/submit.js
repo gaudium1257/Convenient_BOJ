@@ -6,7 +6,7 @@
   if (!m || globalThis.__cbojSubmitLoaded) return;
   globalThis.__cbojSubmitLoaded = true;
   const PID = m[1];
-  const ext = globalThis.__cbojChromeShim || globalThis.chrome;
+  const ext = globalThis.chrome;
 
   const sel = document.querySelector('select[name="language"]');
   if (sel) {

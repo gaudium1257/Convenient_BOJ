@@ -6,7 +6,7 @@
   globalThis.__cbojSplitLoaded = true;
 
   const PID = pathMatch[1];
-  const ext = globalThis.__cbojChromeShim || globalThis.chrome;
+  const ext = globalThis.chrome;
   const DEFAULTS = globalThis.CBOJ_DEFAULTS;
   const CM = globalThis.CodeMirror;
   if (!ext || !ext.storage || !DEFAULTS || !CM) return;
