@@ -50,20 +50,19 @@
 | ![](docs/screenshots/03-run-pass.jpg) | ![](docs/screenshots/04-run-wrong.jpg) | ![](docs/screenshots/05-compile-error-dark.jpg) |
 
 ### 제출 → 정/오답 확인
-1. 분할 화면(A)에서 **제출**(Ctrl + Shift + Enter)을 누르면 작은 백준 제출 창(B)이 열리고, **작성한 코드와 언어가 채워져 있어요.**
+1. 분할 화면(A)에서 **제출**(Ctrl + Shift + Enter)을 누르면 같은 창의 바로 옆에 백준 제출 탭(B)이 열리고, **작성한 코드와 언어가 채워져 있어요.**
 2. B에서 백준의 **[제출]** 버튼만 누르면 돼요.
    백준 제출에는 보안 확인(reCAPTCHA)이 있어서, 마지막 버튼은 사람이 직접 눌러야 해요.
 3. 제출하자마자 **포커스가 A로 돌아와요.** B는 뒤에서 채점 현황을 지켜보고,
    A의 **정/오답 확인** 탭에 `채점 중 → 맞았습니다!!` 가 실시간으로 표시돼요.
 4. 채점이 끝나면 **B는 자동으로 닫혀요.** 채점 전에 B를 직접 닫으면 A에 "제출 기록 열기" 안내가 떠요.
 
-| 채워진 제출 창 | 분할 화면에 뜬 결과 |
+| 채워진 제출 탭 | 분할 화면에 뜬 결과 |
 | --- | --- |
 | ![](docs/screenshots/06-submit-window-filled.jpg) | ![](docs/screenshots/07-judge-result-ac.jpg) |
 
 - 메모리·시간·코드 보기 링크와 **이 문제 내 제출 기록** 링크를 함께 보여 줘요.
 - 코드 공개 설정은 팝업에서 고를 수 있어요(기본값: 백준 설정을 따름).
-- 제출 창이 열리지 않으면 주소창 오른쪽의 팝업 차단 아이콘에서 acmicpc.net 팝업을 허용해 주세요.
 
 ## 설치
 
@@ -109,7 +108,7 @@ git tag v1.0.1; git push origin v1.0.1
 | --- | --- |
 | Alt + C | 분할 화면 열기/닫기 |
 | Ctrl + Enter | 예제로 실행 |
-| Ctrl + Shift + Enter | 제출 창 열기 |
+| Ctrl + Shift + Enter | 제출 탭 열기 |
 | Ctrl + S | 코드 저장 |
 
 ## 알아 두면 좋은 점
@@ -124,8 +123,8 @@ git tag v1.0.1; git push origin v1.0.1
 
 ```
 manifest.json            확장 설정 (MV3)
-background.js            코드 실행(Wandbox API), 내 PC 도우미 연결, 제출 창 열기·포커스·닫기
-content/split.js         분할 화면: 에디터, 실행 터미널, 제출 창 열기, 채점 결과 표시
+background.js            코드 실행(Wandbox API), 내 PC 도우미 연결, 제출 탭 열기·포커스·닫기
+content/split.js         분할 화면: 에디터, 실행 터미널, 제출 탭 열기, 채점 결과 표시
 content/split.css
 content/submit.js        제출 페이지: 코드·언어 채우기 안내, 언어 목록 저장
 content/submit-main.js   제출 페이지(페이지 world): 백준 에디터에 코드 넣기

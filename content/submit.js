@@ -66,7 +66,7 @@
     setTimeout(() => clearInterval(timer), 6000);
   }
 
-  // 분할 화면이 연 제출 창(B)인지 백그라운드에 확인하고, 2분 안에 만든 제출 요청만 채운다.
+  // 분할 화면이 연 제출 탭(B)인지 백그라운드에 확인하고, 2분 안에 만든 제출 요청만 채운다.
   let tries = 0;
   const look = () => {
     ext.storage.local.get({ cbojPending: null }, ({ cbojPending: p }) => {
