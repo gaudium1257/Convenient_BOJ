@@ -168,10 +168,13 @@
       },
     });
     cm.setSize('100%', '100%');
-    cm.on('change', () => {
+    // 코드가 바뀌거나 커서만 옮겨도 잠시 뒤 저장한다 (다시 열면 마지막 작업 위치로)
+    const scheduleSave = () => {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => saveDraft(false), 500);
-    });
+      saveTimer = setTimeout(() => saveDraft(false), 600);
+    };
+    cm.on('change', scheduleSave);
+    cm.on('cursorActivity', scheduleSave);
 
     langSel.addEventListener('change', async () => {
       await saveDraft(false);
@@ -253,16 +256,10 @@
   async function saveDraft(notify) {
     if (!cm) return;
     const info = currentInfo();
-    const key = draftKey(info.family);
-    const code = cm.getValue();
-    if (code === templateFor(info.family).code) {
-      // 손대지 않은 기본 코드는 저장하지 않는다.
-      // 그래야 다음에 열 때도 기본 코드와 $0 커서 위치가 그대로 쓰이고, 팝업에서 바꾼 기본 코드도 반영된다.
-      try { ext.storage.local.remove(key); } catch { /* 확장이 다시 로드됨 */ }
-    } else {
-      const { line, ch } = cm.getCursor();
-      store.set('local', { [key]: { code, cursor: { line, ch }, at: Date.now() } });
-    }
+    // 한 번 연 문제는 기본 코드와 똑같은 내용이어도 항상 저장한다.
+    // 그래서 $0 위치는 그 문제·언어를 '처음' 열 때와 [↺ 초기화] 때만 쓰인다.
+    const { line, ch } = cm.getCursor();
+    store.set('local', { [draftKey(info.family)]: { code: cm.getValue(), cursor: { line, ch }, at: Date.now() } });
     if (notify) setStatus('저장했어요', 'ok');
   }
   async function loadDraft() {
@@ -271,7 +268,7 @@
     const key = draftKey(info.family);
     const v = await store.get('local', { [key]: null });
     const d = v[key];
-    if (d && typeof d.code === 'string' && d.code !== templateFor(info.family).code) {
+    if (d && typeof d.code === 'string') {
       cm.setValue(d.code);
       cm.clearHistory();
       // 마지막으로 작업하던 자리로 커서를 돌려놓는다 (예전 저장본은 코드 끝으로).
