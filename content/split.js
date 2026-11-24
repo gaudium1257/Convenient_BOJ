@@ -18,6 +18,7 @@
     { id: '28', name: 'Python 3' }, { id: '73', name: 'PyPy3' },
   ];
   const TEMPLATES = globalThis.CBOJ_TEMPLATES;
+  const useTabs = () => settings.indent !== 'space'; // 기본: 탭 문자로 들여쓰기
   const expandTemplate = globalThis.cbojExpandTemplate;
 
   function langInfo(name) {
@@ -134,13 +135,30 @@
       lineNumbers: true,
       indentUnit: 4,
       tabSize: 4,
-      indentWithTabs: false,
+      indentWithTabs: useTabs(),
       matchBrackets: true,
       autoCloseBrackets: true,
       theme: settings.editorTheme === 'dark' ? 'cboj-dark' : 'cboj-light',
       extraKeys: {
-        Tab: (c) => (c.somethingSelected() ? c.indentSelection('add') : c.replaceSelection('    ', 'end')),
+        Tab: (c) => {
+          if (c.somethingSelected()) { c.indentSelection('add'); return; }
+          if (useTabs()) { c.replaceSelection('\t', 'end'); return; }
+          // 공백 모드: 다음 4칸 위치까지 공백을 채운다
+          const cur = c.getCursor();
+          const col = CM.countColumn(c.getLine(cur.line), cur.ch, 4);
+          c.replaceSelection(' '.repeat(4 - (col % 4)), 'end');
+        },
         'Shift-Tab': (c) => c.indentSelection('subtract'),
+        // 공백 모드에서 줄 앞 공백을 지울 때는 4칸 단위로 한 번에 지운다
+        Backspace: (c) => {
+          if (useTabs() || c.somethingSelected()) return CM.Pass;
+          const cur = c.getCursor();
+          const before = c.getLine(cur.line).slice(0, cur.ch);
+          if (!before || /[^ ]/.test(before)) return CM.Pass;
+          const n = before.length % 4 || 4;
+          c.replaceRange('', { line: cur.line, ch: cur.ch - n }, cur);
+          return undefined;
+        },
         'Ctrl-Enter': () => runSamples(),
         'Cmd-Enter': () => runSamples(),
         'Shift-Ctrl-Enter': () => submit(),
@@ -267,7 +285,10 @@
   function templateFor(family) {
     // 팝업에서 바꾼 기본 코드가 있으면 그걸, 없으면 기본값을 쓴다.
     const custom = settings.templates && settings.templates[family];
-    return expandTemplate(typeof custom === 'string' ? custom : TEMPLATES[family]);
+    let text = typeof custom === 'string' ? custom : TEMPLATES[family];
+    // 탭 모드면 줄 앞 공백 4칸을 탭 문자로 바꿔 둔다 (백스페이스 한 번에 지워지도록)
+    if (useTabs()) text = text.replace(/^ +/gm, (m) => '\t'.repeat(Math.floor(m.length / 4)) + ' '.repeat(m.length % 4));
+    return expandTemplate(text);
   }
   function setTemplate() {
     const t = templateFor(currentInfo().family);
@@ -571,6 +592,7 @@
   function applySettings(s) {
     settings = { ...DEFAULTS, ...s };
     if (cm) cm.setOption('theme', settings.editorTheme === 'dark' ? 'cboj-dark' : 'cboj-light');
+    if (cm) cm.setOption('indentWithTabs', useTabs());
     if (ui) ui.panel.classList.toggle('dark', settings.editorTheme === 'dark');
   }
   store.get('sync', DEFAULTS).then((s) => {
