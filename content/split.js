@@ -137,7 +137,8 @@
       tabSize: 4,
       indentWithTabs: useTabs(),
       matchBrackets: true,
-      autoCloseBrackets: true,
+      // 괄호 사이 엔터 처리는 smartEnter가 VS Code 방식으로 하므로 explode는 끈다
+      autoCloseBrackets: { pairs: '()[]{}\'\'""', explode: '' },
       theme: settings.editorTheme === 'dark' ? 'cboj-dark' : 'cboj-light',
       extraKeys: {
         Tab: (c) => {
@@ -149,6 +150,7 @@
           c.replaceSelection(' '.repeat(4 - (col % 4)), 'end');
         },
         'Shift-Tab': (c) => c.indentSelection('subtract'),
+        Enter: (c) => smartEnter(c),
         // 공백 모드에서 줄 앞 공백을 지울 때는 4칸 단위로 한 번에 지운다
         Backspace: (c) => {
           if (useTabs() || c.somethingSelected()) return CM.Pass;
@@ -279,6 +281,58 @@
       setTemplate();
     }
   }
+  // 엔터 자동 들여쓰기: VS Code의 언어별 규칙을 따른다.
+  // - C/C++ : 줄이 닫히지 않은 '{' 또는 '('로 끝나면 한 단계 들여쓰기, 그 밖에는 같은 깊이
+  //           (';'가 빠진 줄이나 'if (x)' 다음 줄도 같은 깊이)
+  // - Python: 'def/if/for/while/else…'로 시작해 ':'로 끝나거나, 열린 괄호로 끝나면 들여쓰기
+  //           'return/pass/break/continue/raise' 다음 줄은 한 단계 내어쓰기
+  // - 괄호 쌍 사이( {|}, (|), [|] )에서 누르면 가운데 줄을 만들고 닫는 괄호는 원래 깊이로
+  const VSC = {
+    cIncrease: /^.*\{[^}"']*$|^.*\([^)"']*$/,
+    pyIncrease: /^\s*(?:def|class|for|if|elif|else|while|try|with|finally|except|async|match|case)\b.*:\s*(#.*)?$/,
+    pyBracket: /[([{]\s*(#.*)?$/,
+    pyOutdent: /^\s*(?:pass|break|continue|raise\b.*|return\b.*)\s*(#.*)?$/,
+  };
+  const PAIRS = { '{': '}', '(': ')', '[': ']' };
+
+  function smartEnter(c) {
+    if (c.somethingSelected() || c.listSelections().length > 1) return CM.Pass;
+    const unit = useTabs() ? '\t' : '    ';
+    const cur = c.getCursor();
+    const text = c.getLine(cur.line);
+    const before = text.slice(0, cur.ch);
+    const after = text.slice(cur.ch);
+    const base = text.match(/^[ \t]*/)[0];
+    const py = currentInfo().family === 'py';
+    const beforeCode = py ? before : before.replace(/\/\/.*$/, '');
+
+    let indent = base;
+    if (py) {
+      if (VSC.pyIncrease.test(before) || VSC.pyBracket.test(before)) indent = base + unit;
+      else if (VSC.pyOutdent.test(before)) indent = outdent(base);
+    } else if (VSC.cIncrease.test(beforeCode)) {
+      indent = base + unit;
+    }
+
+    const rest = after.replace(/^[ \t]+/, '');
+    const open = before.trimEnd().slice(-1);
+    if (PAIRS[open] && rest.startsWith(PAIRS[open])) {
+      // 괄호 쌍 사이: 가운데 줄은 한 단계 안쪽, 닫는 괄호는 원래 깊이
+      c.replaceRange(`\n${base + unit}\n${base}`, cur, { line: cur.line, ch: cur.ch + (after.length - rest.length) });
+      c.setCursor({ line: cur.line + 1, ch: (base + unit).length });
+      return undefined;
+    }
+    c.replaceRange(`\n${indent}`, cur, { line: cur.line, ch: cur.ch + (after.length - rest.length) });
+    c.setCursor({ line: cur.line + 1, ch: indent.length });
+    return undefined;
+  }
+
+  function outdent(ws) {
+    if (ws.endsWith('\t')) return ws.slice(0, -1);
+    const m = ws.match(/ {1,4}$/);
+    return m ? ws.slice(0, -m[0].length) : ws;
+  }
+
   function templateFor(family) {
     // 팝업에서 바꾼 기본 코드가 있으면 그걸, 없으면 기본값을 쓴다.
     const custom = settings.templates && settings.templates[family];
