@@ -123,7 +123,7 @@
         : info.gcc ? 'C ✔ · C++ 없음'
           : info.gpp ? 'C++ ✔ · C 없음'
             : 'C/C++ 없음';
-      const parts = [`Python ${info.python}`, cpp];
+      const parts = [`Python ${info.python}`, cpp, info.javac ? 'Java ✔' : 'Java 없음'];
       runnerState.className = 'runner-state on';
       runnerState.append('● 내 PC', Object.assign(document.createElement('small'), { textContent: parts.join(' · ') }));
     } else {

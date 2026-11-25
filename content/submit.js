@@ -7,8 +7,9 @@
   globalThis.__cbojSubmitLoaded = true;
   const PID = m[1];
   const ext = globalThis.chrome;
+  const S = globalThis.CBOJ_SEL.submit; // 백준 제출 페이지 선택자 (shared/boj.js)
 
-  const sel = document.querySelector('select[name="language"]');
+  const sel = document.querySelector(S.language);
   if (sel) {
     const langs = [...sel.options].filter((o) => o.value !== '').map((o) => ({ id: o.value, name: o.textContent.trim() }));
     if (langs.length) ext.storage.local.set({ cbojLangs: langs });
@@ -31,8 +32,8 @@
   }
 
   function submitButton() {
-    const form = document.getElementById('submit_form') || document;
-    return [...form.querySelectorAll('button, input[type="submit"]')]
+    const form = document.querySelector(S.form) || document;
+    return [...form.querySelectorAll(S.buttons)]
       .find((b) => b.offsetParent !== null && /제출/.test(b.textContent || b.value || ''));
   }
 
@@ -60,7 +61,7 @@
       }
     };
     addEventListener('message', onMsg);
-    const send = () => window.postMessage({ cboj: 'fill', code: p.code, langId: p.langId, codeOpen: p.codeOpen }, location.origin);
+    const send = () => window.postMessage({ cboj: 'fill', code: p.code, langId: p.langId, codeOpen: p.codeOpen, sel: { ...S } }, location.origin);
     const timer = setInterval(send, 300);
     send();
     setTimeout(() => clearInterval(timer), 6000);

@@ -3,7 +3,8 @@
 # 하는 일
 #   1. Python 확인 (없으면 winget으로 설치할지 물어봄)
 #   2. C/C++ 컴파일러 gcc/g++ 확인 (없으면 winget으로 WinLibs 설치할지 물어봄)
-#   3. 도우미를 %LOCALAPPDATA%\ConvenientBOJ 에 복사하고 크롬·엣지·웨일에 등록
+#   3. Java(JDK) 확인 (없으면 winget으로 Temurin JDK 21 설치할지 물어봄, Java를 안 쓰면 건너뛰어도 됨)
+#   4. 도우미를 %LOCALAPPDATA%\ConvenientBOJ 에 복사하고 크롬·엣지·웨일에 등록
 #
 # 실행: install.bat 더블클릭, 또는
 #   powershell -ExecutionPolicy Bypass -File install.ps1 [-Yes]
@@ -13,7 +14,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $HostName = 'com.convenient_boj.runner'
-$ExtensionId = 'mabfdombglhmfnjklbnoglebinejifdi'
+# 도우미를 쓸 수 있는 확장 ID 목록
+#  - mabfdomb… : 저장소(ZIP)에서 개발자 모드로 설치한 버전 (manifest.json의 key로 고정)
+#  - 크롬 웹 스토어에 등록하면 스토어가 다른 ID를 준다 → 그 ID를 아래에 추가한다
+$ExtensionIds = @(
+  'mabfdombglhmfnjklbnoglebinejifdi'
+)
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Dest = Join-Path $env:LOCALAPPDATA 'ConvenientBOJ'
 
@@ -56,6 +62,18 @@ function Find-Gpp {
   if ($cmd) { return $cmd.Source }
   $candidates = @("$env:LOCALAPPDATA\Microsoft\WinGet\Links\g++.exe", 'C:\msys64\ucrt64\bin\g++.exe', 'C:\msys64\mingw64\bin\g++.exe')
   $candidates += Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\BrechtSanders.WinLibs*\mingw64\bin\g++.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
+  return $null
+}
+
+function Find-Javac {
+  $cmd = Get-Command javac -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  $candidates = @()
+  if ($env:JAVA_HOME) { $candidates += Join-Path $env:JAVA_HOME 'bin\javac.exe' }
+  foreach ($base in 'C:\Program Files\Eclipse Adoptium', 'C:\Program Files\Microsoft', 'C:\Program Files\Java', 'C:\Program Files\Zulu') {
+    $candidates += Get-ChildItem "$base\*jdk*\bin\javac.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  }
   foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
   return $null
 }
@@ -105,7 +123,19 @@ if (-not $gpp) {
 }
 if ($gpp) { Write-Ok "g++: $gpp" } else { Write-Warn 'gcc/g++ 없이 계속해요. C/C++은 지금처럼 Wandbox(온라인)에서 실행돼요.' }
 
-# 3) 도우미 복사·등록
+# 3) Java (JDK)
+Write-Step 'Java(JDK) 확인'
+$javac = Find-Javac
+if (-not $javac) {
+  Write-Warn 'Java(JDK)가 없어요. Java 코드를 내 PC에서 실행하려면 필요해요. (Java를 안 쓰면 없어도 돼요)'
+  if (Confirm-Action 'winget으로 Temurin JDK 21(약 200MB)을 설치할까요?') {
+    Install-WithWinget 'EclipseAdoptium.Temurin.21.JDK' 'Temurin JDK 21' | Out-Null
+    $javac = Find-Javac
+  }
+}
+if ($javac) { Write-Ok "javac: $javac" } else { Write-Warn 'JDK 없이 계속해요. Java는 지금처럼 Wandbox(온라인)에서 실행돼요.' }
+
+# 4) 도우미 복사·등록
 Write-Step '도우미 설치'
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 Copy-Item (Join-Path $Here 'cboj_host.py') $Dest -Force
@@ -119,7 +149,7 @@ $manifest = [ordered]@{
   description     = 'Convenient BOJ local runner'
   path            = $bat
   type            = 'stdio'
-  allowed_origins = @("chrome-extension://$ExtensionId/")
+  allowed_origins = @($ExtensionIds | ForEach-Object { "chrome-extension://$_/" })
 } | ConvertTo-Json
 [IO.File]::WriteAllText($manifestPath, $manifest, (New-Object Text.UTF8Encoding $false))
 

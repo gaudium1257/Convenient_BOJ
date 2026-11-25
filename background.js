@@ -9,8 +9,10 @@ const FALLBACK = {
   clangc: 'clang-17.0.1-c',
   clangcpp: 'clang-17.0.1',
   python: 'cpython-3.13.18',
+  java: 'openjdk-jdk-21+35',
 };
 const DAY = 24 * 60 * 60 * 1000;
+const CACHE_KEY = 'wandboxCompilers2';
 
 let compilerCache = null;
 
@@ -30,8 +32,8 @@ function newest(names) {
 
 async function compilers() {
   if (compilerCache) return compilerCache;
-  const saved = (await chrome.storage.local.get('wandboxCompilers')).wandboxCompilers;
-  if (saved && Date.now() - saved.at < DAY) return (compilerCache = saved.map);
+  const saved = (await chrome.storage.local.get(CACHE_KEY))[CACHE_KEY];
+  if (saved && Date.now() - saved.at < DAY) return (compilerCache = { ...FALLBACK, ...saved.map });
   try {
     const list = await (await fetch(WANDBOX + '/list.json')).json();
     const names = list.map((c) => c.name);
@@ -42,56 +44,87 @@ async function compilers() {
       clangc: pick(/^clang-\d+\.\d+\.\d+-c$/),
       clangcpp: pick(/^clang-\d+\.\d+\.\d+$/),
       python: pick(/^cpython-3\.\d+\.\d+$/),
+      java: pick(/^openjdk-jdk-\d+/),
     };
     for (const k in FALLBACK) map[k] = map[k] || FALLBACK[k];
-    await chrome.storage.local.set({ wandboxCompilers: { at: Date.now(), map } });
+    await chrome.storage.local.set({ [CACHE_KEY]: { at: Date.now(), map } });
     return (compilerCache = map);
   } catch {
     return FALLBACK;
   }
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
+
+function httpError(status) {
+  if (status === 429) return '실행 서버(Wandbox)가 지금 너무 바빠요. 잠시 후 다시 실행해 주세요.';
+  if (status >= 500) return `실행 서버(Wandbox)에 일시적인 문제가 있어요 (HTTP ${status}). 잠시 후 다시 실행해 주세요.`;
+  return `실행 서버 응답 오류 (HTTP ${status})`;
+}
+
 async function run({ lang, code, stdin }) {
   const map = await compilers();
-  let compiler, options = [];
+  let compiler, options = [], source = code, file = 'main.cpp';
   if (lang.kind === 'python') {
     compiler = map.python;
+    file = 'main.py';
+  } else if (lang.kind === 'java') {
+    compiler = map.java;
+    file = 'Main.java';
+    // Wandbox는 소스 파일 이름이 prog.java라서 'public class Main'을 그대로 컴파일하지 못한다.
+    // 줄 수가 바뀌지 않게 public만 지운다.
+    source = code.replace(/\bpublic\s+((?:final\s+)?class\s+Main\b)/, '$1');
   } else if (lang.kind === 'c') {
     compiler = lang.clang ? map.clangc : map.c;
+    file = 'main.c';
     options = ['-O2', '-std=' + (lang.std || 'gnu11'), '-DONLINE_JUDGE', '-DBOJ', '-lm'];
   } else {
     compiler = lang.clang ? map.clangcpp : map.cpp;
     options = ['-O2', '-std=' + (lang.std || 'gnu++17'), '-DONLINE_JUDGE', '-DBOJ'];
   }
+  // 컴파일러 메시지의 파일 이름을 사용자가 보는 이름으로 바꾼다
+  const rename = (t) => String(t || '').replace(/\bprog\.(?:cc|c|cpp|java|py)\b/g, file);
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 40000);
   const started = Date.now();
-  try {
-    const res = await fetch(WANDBOX + '/compile.json', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ compiler, code, stdin: stdin || '', 'compiler-option-raw': options.join('\n'), save: false }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) return { ok: false, error: `실행 서버 응답 오류 (HTTP ${res.status})`, compiler };
-    const j = await res.json();
-    return {
-      ok: true,
-      compiler,
-      options,
-      status: j.status,
-      signal: j.signal || '',
-      compileError: j.compiler_error || '',
-      stdout: j.program_output || '',
-      stderr: j.program_error || '',
-      ms: Date.now() - started,
-    };
-  } catch (e) {
-    return { ok: false, error: e.name === 'AbortError' ? '실행 시간이 너무 오래 걸려 중단했어요 (40초).' : '실행 서버에 연결하지 못했어요.', compiler };
-  } finally {
-    clearTimeout(timer);
+  let lastError = '실행 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.';
+  // 서버가 바쁘거나 잠깐 끊긴 경우 두 번까지 다시 시도한다
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await sleep(800 * attempt);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40000);
+    try {
+      const res = await fetch(WANDBOX + '/compile.json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ compiler, code: source, stdin: stdin || '', 'compiler-option-raw': options.join('\n'), save: false }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        lastError = httpError(res.status);
+        if (RETRY_STATUS.has(res.status)) continue;
+        return { ok: false, error: lastError, compiler };
+      }
+      const j = await res.json();
+      return {
+        ok: true,
+        compiler,
+        options,
+        status: j.status,
+        signal: j.signal || '',
+        compileError: rename(j.compiler_error),
+        stdout: j.program_output || '',
+        stderr: rename(j.program_error),
+        ms: Date.now() - started,
+      };
+    } catch (e) {
+      if (e.name === 'AbortError') return { ok: false, error: '실행 시간이 너무 오래 걸려 중단했어요 (40초). 무한 루프가 없는지 확인해 주세요.', compiler };
+      lastError = '실행 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.';
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  return { ok: false, error: lastError + ' (내 PC 실행 도우미를 설치하면 인터넷 없이도 실행돼요)', compiler };
 }
 
 // ───────── 제출 탭 관리 ─────────

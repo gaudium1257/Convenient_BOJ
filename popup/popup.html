@@ -23,6 +23,14 @@
       <span><b>문제를 열면 바로 펼치기</b><small>꺼져 있으면 제목 옆 [⇆ 코드 작성] 버튼이나 Alt+C로 열어요</small></span>
       <input type="checkbox" data-key="splitAutoOpen"><i></i>
     </label>
+    <label class="toggle">
+      <span><b>자동완성</b><small>입력하면서 후보를 띄워요 (Ctrl+Space로 언제든 열기)</small></span>
+      <input type="checkbox" data-key="autocomplete"><i></i>
+    </label>
+    <label class="toggle">
+      <span><b>풀이 타이머 자동 시작</b><small>분할 화면을 열면 시작, 맞았습니다!! 에서 멈춰요</small></span>
+      <input type="checkbox" data-key="timerAutoStart"><i></i>
+    </label>
     <div class="row">
       <h2>에디터 테마</h2>
       <div class="seg" data-key="editorTheme">
@@ -50,7 +58,7 @@
     <div class="row">
       <h2>기본 코드</h2>
       <div class="seg" id="tplLang">
-        <button data-lang="cpp">C++</button><button data-lang="c">C</button><button data-lang="py">Python</button>
+        <button data-lang="cpp">C++</button><button data-lang="c">C</button><button data-lang="java">Java</button><button data-lang="py">Python</button>
       </div>
     </div>
     <textarea id="tplText" spellcheck="false" placeholder="(비어 있음: 빈 화면에서 시작해요)"></textarea>

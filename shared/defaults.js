@@ -4,13 +4,18 @@ globalThis.CBOJ_DEFAULTS = Object.freeze({
   editorTheme: 'light',
   indent: 'tab', // tab(탭 문자) | space(공백 4칸)
   codeOpen: 'default', // default(백준 설정 따름) | open | close | onlyaccepted
-  templates: {}, // 사용자가 바꾼 기본 코드 { cpp, c, py } (비어 있으면 아래 기본값)
+  templates: {}, // 사용자가 바꾼 기본 코드 { cpp, c, java, py } (비어 있으면 아래 기본값)
+  autocomplete: true, // 입력하면서 자동완성 목록 띄우기 (Ctrl+Space는 항상 가능)
+  timerAutoStart: false, // 분할 화면을 열면 풀이 타이머 자동 시작
 });
 
 // 언어별 기본 코드. $0 은 처음 커서가 놓일 자리.
 globalThis.CBOJ_TEMPLATES = Object.freeze({
   cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n\n    $0\n    return 0;\n}\n',
   c: '#include <stdio.h>\n\nint main(void) {\n    $0\n    return 0;\n}\n',
+  // 백준 Java 규칙: public class Main. 빠른 입력은 BufferedReader가 백준에서 흔한 형태
+  java: 'import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n'
+    + '        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        $0\n    }\n}\n',
   py: '', // 파이썬은 보통 기본 코드 없이 시작한다 (빠른 입력이 필요하면 팝업에서 추가)
 });
 

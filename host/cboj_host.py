@@ -77,6 +77,15 @@ def _search_path():
             os.path.join(local, 'Microsoft', 'WinGet', 'Links'),
             r'C:\msys64\ucrt64\bin', r'C:\msys64\mingw64\bin', r'C:\MinGW\bin', r'C:\mingw64\bin',
         ]
+        # JDK: JAVA_HOME, 흔한 설치 위치 (Temurin, Microsoft, Oracle 등)
+        if os.environ.get('JAVA_HOME'):
+            dirs.append(os.path.join(os.environ['JAVA_HOME'], 'bin'))
+        for base in (r'C:\Program Files\Eclipse Adoptium', r'C:\Program Files\Microsoft',
+                     r'C:\Program Files\Java', r'C:\Program Files\Zulu', os.path.join(local, 'Programs')):
+            if os.path.isdir(base):
+                for name in sorted(os.listdir(base), reverse=True):
+                    if 'jdk' in name.lower():
+                        dirs.append(os.path.join(base, name, 'bin'))
         pkgs = os.path.join(local, 'Microsoft', 'WinGet', 'Packages')
         if os.path.isdir(pkgs):
             for name in os.listdir(pkgs):
@@ -108,7 +117,7 @@ def tool_version(path):
         return None
 
 
-TOOLS = {'gcc': find_tool('gcc'), 'g++': find_tool('g++')}
+TOOLS = {'gcc': find_tool('gcc'), 'g++': find_tool('g++'), 'javac': find_tool('javac'), 'java': find_tool('java')}
 
 
 def child_env():
@@ -127,6 +136,7 @@ def info():
         'python': sys.version.split()[0],
         'gcc': tool_version(TOOLS['gcc']),
         'gpp': tool_version(TOOLS['g++']),
+        'javac': tool_version(TOOLS['javac']) if TOOLS['java'] else None,
     }
 
 
@@ -143,6 +153,26 @@ def prepare(lang, code, workdir, interactive):
         with open(src, 'w', encoding='utf-8', newline='\n') as f:
             f.write(code)
         return [sys.executable, '-u', src], f'python main.py  (Python {sys.version.split()[0]})', None, None
+
+    if kind == 'java':
+        javac, java = TOOLS['javac'], TOOLS['java']
+        if not javac or not java:
+            return None, None, {'code': 'nocompiler', 'message': 'Java(JDK)의 javac를 찾지 못했어요.'}, None
+        src = os.path.join(workdir, 'Main.java')  # 백준 규칙: public class Main
+        with open(src, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(code)
+        try:
+            r = subprocess.run([javac, '-encoding', 'UTF-8', '-J-Xss512m', src], capture_output=True, timeout=90,
+                               cwd=workdir, creationflags=NO_WINDOW, env=child_env())
+        except subprocess.TimeoutExpired:
+            return None, 'javac Main.java', {'code': 'compile', 'message': '컴파일이 90초를 넘겨 중단했어요.'}, None
+        output = (r.stderr + r.stdout).decode('utf-8', 'replace').replace(workdir + os.sep, '')
+        if r.returncode != 0:
+            return None, 'javac Main.java', {'code': 'compile', 'message': output}, None
+        # 백준 Java 11 실행 옵션과 같게 (스택 512MB, ONLINE_JUDGE 속성)
+        cmd = [java, '-Xss512m', '-Dfile.encoding=UTF-8', '-XX:+UseSerialGC',
+               '-DONLINE_JUDGE=1', '-DBOJ=1', '-cp', workdir, 'Main']
+        return cmd, 'javac Main.java && java -Xss512m Main', None, output
 
     is_c = kind == 'c'
     compiler = TOOLS['gcc' if is_c else 'g++']
@@ -167,6 +197,8 @@ def prepare(lang, code, workdir, interactive):
         args.append('-lm')
     if IS_WIN:
         args.append('-static')  # MinGW DLL 없이 실행되게
+        # 윈도우 기본 스택(1MB)은 백준보다 훨씬 작아 깊은 재귀가 내 PC에서만 터진다 → 256MB로 키운다
+        args.append('-Wl,--stack,268435456')
     shown = f"{'gcc' if is_c else 'g++'} -O2 -std={std} {os.path.basename(src)}"
     try:
         r = subprocess.run(args, capture_output=True, timeout=60, cwd=workdir,

@@ -24,9 +24,10 @@
     let last = '';
     let lastChange = Date.now();
 
+    const S = globalThis.CBOJ_SEL.status;
     const findRow = () => {
-      if (solId) return document.getElementById('solution-' + solId);
-      return [...document.querySelectorAll('#status-table tbody tr')]
+      if (solId) return document.getElementById(S.rowIdPrefix + solId);
+      return [...document.querySelectorAll(S.rows)]
         .find((tr) => tr.querySelector(`a[href="/problem/${w.pid}"]`));
     };
 

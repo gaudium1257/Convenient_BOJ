@@ -28,23 +28,32 @@ jobs:
 
       - name: ZIP 만들기
         run: |
+          # 1) 직접 설치용: 압축을 풀어 '압축해제된 확장 프로그램'으로 로드 (확장 ID 고정용 key 포함, 도우미 포함)
           mkdir -p out/Convenient_BOJ
           cp -r manifest.json background.js content popup shared icons vendor host out/Convenient_BOJ/
           (cd out && zip -qr ../Convenient_BOJ.zip Convenient_BOJ)
           unzip -l Convenient_BOJ.zip
+          # 2) 크롬 웹 스토어 업로드용: 스토어는 manifest의 key를 받지 않고, 도우미 파일도 필요 없다
+          mkdir -p store
+          cp -r background.js content popup shared icons vendor store/
+          jq 'del(.key)' manifest.json > store/manifest.json
+          (cd store && zip -qr ../Convenient_BOJ-webstore.zip .)
+          unzip -l Convenient_BOJ-webstore.zip | tail -3
 
       - name: 아티팩트로 올리기
         uses: actions/upload-artifact@v4
         with:
           name: Convenient_BOJ
-          path: Convenient_BOJ.zip
+          path: |
+            Convenient_BOJ.zip
+            Convenient_BOJ-webstore.zip
 
       - name: Releases에 올리기
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" Convenient_BOJ.zip \
+          gh release create "$GITHUB_REF_NAME" Convenient_BOJ.zip Convenient_BOJ-webstore.zip \
             --repo "$GITHUB_REPOSITORY" \
             --title "Convenient BOJ $GITHUB_REF_NAME" \
             --notes "$(cat <<'NOTES'
@@ -57,6 +66,8 @@ jobs:
 
           ## 내 PC에서 실행 (진짜 터미널, 선택)
           압축을 푼 폴더의 `host\install.bat` 을 더블클릭하고 묻는 대로 답하면 돼요. (Windows)
+
+          > `Convenient_BOJ-webstore.zip` 은 크롬 웹 스토어 업로드용이에요. 직접 설치할 때는 `Convenient_BOJ.zip` 을 쓰세요.
           NOTES
           )" \
             --generate-notes

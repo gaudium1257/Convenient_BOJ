@@ -10,9 +10,14 @@
     const d = e.data;
     if (!d || d.cboj !== 'fill') return;
     const res = { cboj: 'filled', ok: false, langOk: false };
+    // 선택자는 submit.js가 shared/boj.js의 값을 넘겨준다 (없으면 기본값)
+    const S = Object.assign({
+      language: 'select[name="language"]', codeOpen: 'input[name="code_open"]',
+      editor: '.CodeMirror', source: 'textarea[name="source"]',
+    }, d.sel || {});
     try {
       // 언어를 먼저 바꾼다(언어를 바꾸면 백준이 에디터 내용을 바꿀 수 있어서).
-      const sel = document.querySelector('select[name="language"]');
+      const sel = document.querySelector(S.language);
       if (sel && [...sel.options].some((o) => o.value === String(d.langId))) {
         if (sel.value !== String(d.langId)) {
           sel.value = String(d.langId);
@@ -22,15 +27,15 @@
         res.langOk = true;
       }
       if (d.codeOpen && d.codeOpen !== 'default') {
-        const r = document.querySelector(`input[name="code_open"][value="${d.codeOpen}"]`);
+        const r = document.querySelector(`${S.codeOpen}[value="${d.codeOpen}"]`);
         if (r) r.checked = true;
       }
-      const cmEl = document.querySelector('.CodeMirror');
+      const cmEl = document.querySelector(S.editor);
       if (cmEl && cmEl.CodeMirror) {
         cmEl.CodeMirror.setValue(d.code);
         res.ok = true;
       } else {
-        const ta = document.querySelector('textarea[name="source"]');
+        const ta = document.querySelector(S.source);
         if (ta) { ta.value = d.code; res.ok = true; }
       }
     } catch (err) {

@@ -233,3 +233,67 @@ html.cboj-open .cboj-toggle.floating { display: none; }
 #cboj-panel .cboj-term-out pre.tlive .dim { color: #7F848E; }
 #cboj-panel .cboj-term-in.live { border-color: #98C379; }
 #cboj-panel .cboj-btn.stop { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* ───────── 풀이 타이머 ───────── */
+#cboj-panel .cboj-timer {
+  height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--muted); font: 600 12.5px/1 Consolas, "D2Coding", monospace;
+  margin-left: 4px; min-width: 76px;
+}
+#cboj-panel .cboj-timer.running { color: var(--amber); border-color: rgba(230, 119, 0, .45); }
+#cboj-panel .cboj-timer.solved { color: var(--green); border-color: rgba(43, 147, 72, .45); }
+#cboj-panel .cboj-icon.small { width: 24px; height: 30px; font-size: 13px; }
+.cboj-card-meta .solved-time { color: var(--green); font-weight: 700; }
+
+/* ───────── 나만의 테스트케이스 ───────── */
+.cboj-pane.cases { overflow: auto; padding: 10px 12px; gap: 10px; }
+.cboj-cases-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex: none; }
+.cboj-cases-hint { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.cboj-cases-list { display: flex; flex-direction: column; gap: 8px; }
+.cboj-cases-empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 10px; text-align: center; }
+.cboj-case { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg2); }
+.cboj-case.off { opacity: .55; }
+.cboj-case-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cboj-case-head label { display: flex; align-items: center; gap: 4px; margin: 0; font-weight: 400; cursor: pointer; }
+.cboj-case-body { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#cboj-panel .cboj-case-ta {
+  width: 100%; height: 72px; resize: vertical; margin: 0; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  font: 12.5px/1.45 Consolas, "D2Coding", monospace; white-space: pre; overflow: auto;
+}
+#cboj-panel .cboj-case-ta:focus { outline: none; border-color: var(--blue); }
+#cboj-panel .cboj-link.danger { color: var(--red); }
+.cboj-term-links { display: flex; justify-content: space-between; gap: 8px; }
+
+/* ───────── 출력 비교 ───────── */
+.cboj-term-out .tdiff-wrap { margin: 4px 0 10px; }
+.cboj-term-out .tdiff-note { color: #E5C07B; margin-bottom: 4px; }
+#cboj-panel .cboj-term-out table.tdiff {
+  border-collapse: collapse; width: 100%; font: inherit; table-layout: fixed;
+  border: 1px solid #2C313A; background: #262A31;
+}
+#cboj-panel .cboj-term-out table.tdiff th {
+  text-align: left; font-weight: 600; color: #7F848E; padding: 3px 8px; border-bottom: 1px solid #2C313A;
+}
+#cboj-panel .cboj-term-out table.tdiff th:first-child, #cboj-panel .cboj-term-out table.tdiff td.ln { width: 58px; }
+#cboj-panel .cboj-term-out table.tdiff td {
+  padding: 1px 8px; vertical-align: top; white-space: pre-wrap; word-break: break-all; border: 0;
+}
+#cboj-panel .cboj-term-out table.tdiff td.ln { color: #5C6370; text-align: right; }
+#cboj-panel .cboj-term-out table.tdiff tr.bad td { background: rgba(224, 108, 117, .16); color: #F0A3A9; }
+#cboj-panel .cboj-term-out table.tdiff tr.bad td.ln { color: #E06C75; font-weight: 700; }
+#cboj-panel .cboj-term-out table.tdiff td.none { color: #5C6370; font-style: italic; }
+#cboj-panel .cboj-term-out table.tdiff tr.gap td { color: #5C6370; }
+.cboj-term-out details.tinput { margin-top: 4px; color: #7F848E; }
+.cboj-term-out details.tinput summary { cursor: pointer; font-size: 11.5px; }
+
+/* ───────── 자동완성 목록 ───────── */
+#cboj-panel .CodeMirror-hints {
+  z-index: 2147483000; margin: 0; padding: 3px 0; list-style: none; max-height: 18em;
+  font: 13px/1.5 "D2Coding", "JetBrains Mono", Consolas, monospace;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+#cboj-panel .CodeMirror-hint { margin: 0; padding: 1px 10px; color: var(--ink); border-radius: 0; white-space: pre; }
+#cboj-panel li.CodeMirror-hint-active { background: var(--blue); color: #fff; }
+.cboj-case-cap { font-size: 11px; color: var(--muted); margin-bottom: 2px; }

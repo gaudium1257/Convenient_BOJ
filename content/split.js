@@ -16,6 +16,7 @@
     { id: '84', name: 'C++17' }, { id: '95', name: 'C++20' }, { id: '88', name: 'C++14' },
     { id: '75', name: 'C11' }, { id: '0', name: 'C99' },
     { id: '28', name: 'Python 3' }, { id: '73', name: 'PyPy3' },
+    { id: '93', name: 'Java 11' },
   ];
   const TEMPLATES = globalThis.CBOJ_TEMPLATES;
   const useTabs = () => settings.indent !== 'space'; // 기본: 탭 문자로 들여쓰기
@@ -23,6 +24,7 @@
 
   function langInfo(name) {
     if (/^(Python 3|PyPy3)/.test(name)) return { kind: 'python', family: 'py', mode: 'text/x-python' };
+    if (/^Java\b/.test(name)) return { kind: 'java', family: 'java', mode: 'text/x-java' };
     let m = /^C\+\+(\d+)?/.exec(name);
     if (m) {
       const v = { 98: '98', '03': '03', 11: '11', 14: '14', 17: '17', 20: '20', 23: '23', 26: '2c' }[m[1] || '17'] || '17';
@@ -41,7 +43,6 @@
   const FINAL = globalThis.CBOJ_FINAL || ['ac', 'pac', 'wa', 'pe', 'tle', 'mle', 'ole', 'rte', 'ce'];
 
   // ───────── 유틸 ─────────
-  const $ = (sel, root = document) => root.querySelector(sel);
   const h = (tag, attrs = {}, ...kids) => {
     const el = document.createElement(tag);
     for (const k in attrs) {
@@ -59,28 +60,35 @@
     return lines.join('\n');
   };
 
+  // 작업을 동시에 limit개까지만 돌린다 (결과 순서는 입력 순서 그대로)
+  async function mapLimit(items, limit, fn) {
+    const out = new Array(items.length);
+    let next = 0;
+    const worker = async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await fn(items[i], i);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return out;
+  }
+
   const store = {
     get: (area, defaults) => new Promise((r) => { try { ext.storage[area].get(defaults, (v) => r(v || defaults)); } catch { r(defaults); } }),
     set: (area, obj) => { try { ext.storage[area].set(obj); } catch { /* 확장이 다시 로드됨 */ } },
   };
 
-  const SPJ = !!document.querySelector('.problem-label-spj');
-  function samples() {
-    const list = [];
-    document.querySelectorAll('pre[id^="sample-input-"]').forEach((pre) => {
-      const n = pre.id.replace('sample-input-', '');
-      const out = document.getElementById('sample-output-' + n);
-      list.push({ n, input: pre.textContent, expected: out ? out.textContent : null });
-    });
-    return list;
-  }
+  const BOJ = globalThis.cbojBoj; // 백준 화면 읽기 (shared/boj.js)
+  const SPJ = BOJ.isSpecialJudge();
+  const samples = () => BOJ.samples();
 
   // ───────── 상태 ─────────
   let settings = { ...DEFAULTS };
   let layout = { width: 50, bottom: 260 };
   let langs = FALLBACK_LANGS.filter((l) => langInfo(l.name));
   let langId = null;
-  let me = ($('meta[name="username"]') || {}).content || '';
+  let me = BOJ.username();
   let ui = null;
   let cm = null;
   let saveTimer = 0;
@@ -97,10 +105,21 @@
     const btnRun = h('button', { class: 'cboj-btn run', title: '예제로 실행 (Ctrl+Enter)', text: '▶ 실행' });
     const btnSubmit = h('button', { class: 'cboj-btn submit', title: '백준에 제출 (Ctrl+Shift+Enter)', text: '제출' });
     const btnClose = h('button', { class: 'cboj-icon', title: '분할 화면 닫기', text: '✕' });
+    const timer = h('button', { class: 'cboj-timer', title: '풀이 시간 · 누르면 시작/일시정지' });
+    const timerReset = h('button', { class: 'cboj-icon small', title: '풀이 시간 초기화', text: '↺' });
     const editor = h('div', { class: 'cboj-editor' });
 
     const tabResult = h('button', { class: 'cboj-tab active', 'data-tab': 'result', text: '정/오답 확인' });
+    const tabCases = h('button', { class: 'cboj-tab', 'data-tab': 'cases', text: '테스트케이스' });
     const tabTerm = h('button', { class: 'cboj-tab', 'data-tab': 'term', text: '터미널' });
+    const casesList = h('div', { class: 'cboj-cases-list' });
+    const paneCases = h('div', { class: 'cboj-pane cases' },
+      h('div', { class: 'cboj-cases-head' },
+        h('div', {},
+          h('b', { text: '나만의 테스트케이스' }),
+          h('div', { class: 'cboj-cases-hint', text: '▶ 실행(Ctrl+Enter) 때 예제와 함께 채점돼요. 기대 출력을 비워 두면 출력만 보여 줘요.' })),
+        h('button', { class: 'cboj-btn small', text: '+ 케이스 추가', onclick: () => addCase('', '') })),
+      casesList);
     const status = h('span', { class: 'cboj-status' });
 
     const card = h('div', { class: 'cboj-card empty', text: '제출하면 이곳에서 채점 결과를 실시간으로 볼 수 있어요.' });
@@ -112,25 +131,32 @@
     const termIn = h('textarea', { class: 'cboj-term-in', placeholder: '직접 입력할 stdin', spellcheck: 'false' });
     const btnCustom = h('button', { class: 'cboj-btn run small', text: '이 입력으로 실행' });
     const btnClear = h('button', { class: 'cboj-link', text: '지우기' });
+    const btnSaveCase = h('button', { class: 'cboj-link', text: '케이스로 저장', title: '이 칸의 입력을 나만의 테스트케이스로 저장' });
     const where = h('button', { class: 'cboj-where', title: '코드를 실행하는 곳' });
     const paneTerm = h('div', { class: 'cboj-pane term' }, termOut,
-      h('div', { class: 'cboj-term-bar' }, termIn, h('div', { class: 'cboj-term-actions' }, btnCustom, btnClear)));
+      h('div', { class: 'cboj-term-bar' }, termIn, h('div', { class: 'cboj-term-actions' }, btnCustom,
+        h('div', { class: 'cboj-term-links' }, btnSaveCase, btnClear))));
 
     const resizerX = h('div', { class: 'cboj-resizer-x', title: '드래그해서 너비 조절' });
     const resizerY = h('div', { class: 'cboj-resizer-y', title: '드래그해서 높이 조절' });
     const bottom = h('div', { class: 'cboj-bottom' },
-      h('div', { class: 'cboj-tabs' }, tabResult, tabTerm, status), paneResult, paneTerm);
+      h('div', { class: 'cboj-tabs' }, tabResult, tabCases, tabTerm, status), paneResult, paneCases, paneTerm);
 
     const panel = h('aside', { id: 'cboj-panel', class: 'cboj', 'aria-label': '코드 작성' },
       resizerX,
       h('div', { class: 'cboj-toolbar' },
-        h('span', { class: 'cboj-title', text: PID + '번' }), langSel,
+        h('span', { class: 'cboj-title', text: PID + '번' }), langSel, timer, timerReset,
         h('span', { class: 'cboj-spacer' }), btnReset, btnRun, btnSubmit, btnClose),
       editor, resizerY, bottom);
     document.body.appendChild(panel);
 
     status.before(where);
-    ui = { panel, langSel, editor, bottom, card, termOut, termIn, status, tabResult, tabTerm, paneResult, paneTerm, btnRun, btnSubmit, btnCustom, where };
+    ui = {
+      panel, langSel, editor, bottom, card, termOut, termIn, status, btnRun, btnSubmit, btnCustom, where, timer,
+      casesList, tabCases,
+      tabs: { result: tabResult, cases: tabCases, term: tabTerm },
+      panes: { result: paneResult, cases: paneCases, term: paneTerm },
+    };
 
     cm = CM(editor, {
       value: '',
@@ -169,6 +195,7 @@
         'Shift-Cmd-Enter': () => submit(),
         'Ctrl-S': () => { saveDraft(true); },
         'Cmd-S': () => { saveDraft(true); },
+        'Ctrl-Space': (c) => showHints(c, false),
       },
     });
     cm.setSize('100%', '100%');
@@ -179,6 +206,7 @@
     };
     cm.on('change', scheduleSave);
     cm.on('cursorActivity', scheduleSave);
+    cm.on('inputRead', onInputRead); // 자동완성
 
     langSel.addEventListener('change', async () => {
       await saveDraft(false);
@@ -197,6 +225,17 @@
     btnClose.addEventListener('click', () => close());
     btnCustom.addEventListener('click', () => runCustom());
     btnClear.addEventListener('click', () => { termOut.textContent = ''; });
+    btnSaveCase.addEventListener('click', () => {
+      const v = termIn.value;
+      if (!v.trim()) { termIn.focus(); setStatus('저장할 입력을 먼저 적어 주세요', 'err'); return; }
+      addCase(v, '');
+      showTab('cases');
+    });
+    timer.addEventListener('click', () => (tm.since ? pauseTimer() : startTimer()));
+    timerReset.addEventListener('click', () => {
+      if (tmNow() > 0 && !confirm('풀이 시간을 0으로 되돌릴까요?')) return;
+      resetTimer();
+    });
     termIn.addEventListener('keydown', onTermKey);
     where.addEventListener('click', () => {
       if (runner.state === 'on') return;
@@ -204,7 +243,7 @@
         if (runner.state !== 'on') window.open('https://github.com/gaudium1257/Convenient_BOJ#2단계-내-pc에서-실행-진짜-터미널-선택', '_blank');
       });
     });
-    [tabResult, tabTerm].forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
+    [tabResult, tabCases, tabTerm].forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
     dragResize(resizerX, (e) => {
       const pct = ((innerWidth - e.clientX) / innerWidth) * 100;
@@ -248,9 +287,10 @@
   }
 
   function showTab(name) {
-    for (const t of [ui.tabResult, ui.tabTerm]) t.classList.toggle('active', t.dataset.tab === name);
-    ui.paneResult.classList.toggle('active', name === 'result');
-    ui.paneTerm.classList.toggle('active', name === 'term');
+    for (const k in ui.tabs) {
+      ui.tabs[k].classList.toggle('active', k === name);
+      ui.panes[k].classList.toggle('active', k === name);
+    }
   }
 
   function setStatus(text, kind = '') {
@@ -360,6 +400,237 @@
     if (t.line != null) cm.setCursor({ line: t.line, ch: t.ch });
     else cm.setCursor(cm.lastLine(), cm.getLine(cm.lastLine()).length);
     cm.focus();
+  }
+
+  // ───────── 나만의 테스트케이스 ─────────
+  // 문제마다 { id, input, expected, on } 목록을 저장하고, ▶ 실행 때 예제와 함께 채점한다.
+  const casesKey = `cases:${PID}`;
+  let cases = [];
+  let casesSaveTimer = 0;
+
+  async function loadCases() {
+    const v = await store.get('local', { [casesKey]: [] });
+    cases = Array.isArray(v[casesKey]) ? v[casesKey] : [];
+    renderCases();
+  }
+  function persistCases() {
+    clearTimeout(casesSaveTimer);
+    casesSaveTimer = setTimeout(() => store.set('local', { [casesKey]: cases }), 300);
+    updateCasesTab();
+  }
+  function updateCasesTab() {
+    const on = cases.filter((c) => c.on !== false).length;
+    ui.tabCases.textContent = cases.length ? `테스트케이스 (${on})` : '테스트케이스';
+  }
+  function addCase(input, expected) {
+    cases.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), input, expected, on: true });
+    persistCases();
+    renderCases();
+    const last = ui.casesList.lastElementChild;
+    if (last) { last.scrollIntoView({ block: 'nearest' }); const ta = last.querySelector('textarea'); if (ta && !input) ta.focus(); }
+  }
+  function renderCases() {
+    const list = ui.casesList;
+    list.textContent = '';
+    if (!cases.length) {
+      list.append(h('div', { class: 'cboj-cases-empty', text: '아직 없어요. 반례나 경계값을 저장해 두면 실행할 때마다 함께 확인해요.' }));
+    }
+    cases.forEach((c, i) => {
+      const input = h('textarea', { class: 'cboj-case-ta', spellcheck: 'false', placeholder: '입력' });
+      const expected = h('textarea', { class: 'cboj-case-ta', spellcheck: 'false', placeholder: '기대 출력 (비워 두면 비교 안 함)' });
+      input.value = c.input || '';
+      expected.value = c.expected || '';
+      input.addEventListener('input', () => { c.input = input.value; persistCases(); });
+      expected.addEventListener('input', () => { c.expected = expected.value; persistCases(); });
+      const toggle = h('input', { type: 'checkbox', title: '실행할 때 포함' });
+      toggle.checked = c.on !== false;
+      toggle.addEventListener('change', () => { c.on = toggle.checked; persistCases(); item.classList.toggle('off', !toggle.checked); });
+      const del = h('button', { class: 'cboj-link danger', text: '삭제' });
+      del.addEventListener('click', () => {
+        if ((c.input || c.expected) && !confirm(`케이스 ${i + 1}을(를) 지울까요?`)) return;
+        cases.splice(i, 1);
+        persistCases();
+        renderCases();
+      });
+      const item = h('div', { class: 'cboj-case' + (c.on === false ? ' off' : '') },
+        h('div', { class: 'cboj-case-head' },
+          h('label', {}, toggle, h('b', { text: ` 케이스 ${i + 1}` })), del),
+        h('div', { class: 'cboj-case-body' },
+          h('div', {}, h('div', { class: 'cboj-case-cap', text: '입력' }), input),
+          h('div', {}, h('div', { class: 'cboj-case-cap', text: '기대 출력' }), expected)));
+      list.append(item);
+    });
+    updateCasesTab();
+  }
+
+  // ───────── 출력 비교 (어디가 다른지) ─────────
+  // 백준처럼 줄 끝 공백과 마지막 빈 줄은 무시하고 비교한다.
+  function outLines(s) {
+    const lines = String(s == null ? '' : s).replace(/\r/g, '').split('\n').map((l) => l.replace(/[ \t]+$/, ''));
+    while (lines.length && lines[lines.length - 1] === '') lines.pop();
+    return lines;
+  }
+  const squash = (l) => (l == null ? null : l.replace(/\s+/g, ' ').trim());
+  const showSpaces = (l) => l.replace(/ /g, '·').replace(/\t/g, '→');
+
+  function diffView(item, res) {
+    const exp = outLines(item.expected);
+    const act = outLines(res.stdout);
+    const n = Math.max(exp.length, act.length);
+    let first = -1;
+    for (let i = 0; i < n; i++) if (exp[i] !== act[i]) { first = i; break; }
+
+    const notes = [];
+    if (first >= 0) {
+      notes.push(`${first + 1}번째 줄부터 달라요`);
+      if (exp.length !== act.length) {
+        const d = act.length - exp.length;
+        notes.push(`기대 ${exp.length}줄 / 내 출력 ${act.length}줄 (${d > 0 ? d + '줄 많음' : -d + '줄 부족'})`);
+      }
+      if (exp[first] != null && act[first] != null && squash(exp[first]) === squash(act[first])) notes.push('공백(띄어쓰기)만 달라요');
+    }
+
+    // 다른 줄 주변만 보여 준다
+    const from = Math.max(0, first - 3);
+    const to = Math.min(n, first + 12);
+    const table = h('table', { class: 'tdiff' },
+      h('thead', {}, h('tr', {}, h('th', { text: '' }), h('th', { text: '기대 출력' }), h('th', { text: '내 출력' }))));
+    const body = h('tbody');
+    if (from > 0) body.append(h('tr', { class: 'gap' }, h('td', { text: '⋮' }), h('td', { text: `(위 ${from}줄 같음)` }), h('td')));
+    for (let i = from; i < to; i++) {
+      const bad = exp[i] !== act[i];
+      const ws = bad && exp[i] != null && act[i] != null && squash(exp[i]) === squash(act[i]);
+      const cell = (v) => h('td', { class: v == null ? 'none' : '', text: v == null ? '(없음)' : (ws ? showSpaces(v) : v) });
+      body.append(h('tr', { class: bad ? 'bad' : '' }, h('td', { class: 'ln', text: (bad && i === first ? '▶ ' : '') + (i + 1) }), cell(exp[i]), cell(act[i])));
+    }
+    if (to < n) body.append(h('tr', { class: 'gap' }, h('td', { text: '⋮' }), h('td', { text: `(아래 ${n - to}줄 더 있음)` }), h('td')));
+    table.append(body);
+
+    const input = h('details', { class: 'tinput' }, h('summary', { text: '입력 보기' }),
+      h('pre', { class: 'tb', text: String(item.input || '').replace(/\n$/, '') || '(비어 있음)' }));
+    return h('div', { class: 'tdiff-wrap' },
+      notes.length ? h('div', { class: 'tdiff-note', text: notes.join(' · ') }) : null, table, input);
+  }
+
+  // ───────── 문제 타이머 ─────────
+  const timerKey = `timer:${PID}`;
+  let tm = { elapsed: 0, since: null, solved: null };
+  let tmTick = 0;
+  const tmNow = () => tm.elapsed + (tm.since ? Date.now() - tm.since : 0);
+  const fmtTime = (ms) => {
+    const t = Math.floor(ms / 1000);
+    const hh = Math.floor(t / 3600), mm = Math.floor((t % 3600) / 60), ss = t % 60;
+    const p = (x) => String(x).padStart(2, '0');
+    return hh ? `${hh}:${p(mm)}:${p(ss)}` : `${p(mm)}:${p(ss)}`;
+  };
+
+  async function loadTimer() {
+    const v = await store.get('local', { [timerKey]: null });
+    if (v[timerKey]) tm = { ...tm, ...v[timerKey] };
+    if (!tm.since && !tm.elapsed && !tm.solved && settings.timerAutoStart) startTimer();
+    else { renderTimer(); if (tm.since) tickTimer(); }
+  }
+  function persistTimer() { store.set('local', { [timerKey]: tm }); }
+  function tickTimer() {
+    clearInterval(tmTick);
+    tmTick = setInterval(renderTimer, 1000);
+  }
+  function startTimer() {
+    if (tm.since) return;
+    tm.since = Date.now();
+    tm.solved = null;
+    persistTimer();
+    renderTimer();
+    tickTimer();
+  }
+  function pauseTimer() {
+    if (!tm.since) return;
+    tm.elapsed = tmNow();
+    tm.since = null;
+    clearInterval(tmTick);
+    persistTimer();
+    renderTimer();
+  }
+  function resetTimer() {
+    clearInterval(tmTick);
+    tm = { elapsed: 0, since: null, solved: null };
+    persistTimer();
+    renderTimer();
+  }
+  function renderTimer() {
+    if (!ui) return;
+    const t = ui.timer;
+    t.textContent = `⏱ ${fmtTime(tmNow())}`;
+    t.className = 'cboj-timer' + (tm.since ? ' running' : tm.solved ? ' solved' : '');
+    t.title = tm.since ? '풀이 시간 · 누르면 일시정지'
+      : tm.solved ? `맞았을 때 멈춘 시간이에요 (${fmtTime(tm.solved)}). 누르면 다시 시작`
+        : '풀이 시간 · 누르면 시작';
+  }
+  // 맞았습니다!! 를 받으면 타이머를 멈추고 그 시간을 기록한다
+  function onSolved() {
+    if (!tm.since && !tm.elapsed) return null;
+    pauseTimer();
+    tm.solved = tm.elapsed;
+    persistTimer();
+    renderTimer();
+    return tm.solved;
+  }
+
+  // ───────── 자동완성 ─────────
+  const KEYWORDS = {
+    cpp: ('int long double float char bool void auto const static struct class public private return if else for while do switch case default break continue '
+      + 'true false nullptr namespace using template typename vector string map set unordered_map unordered_set multiset pair queue priority_queue stack deque '
+      + 'array tuple bitset make_pair make_tuple push_back pop_back emplace_back push pop front back top size empty clear insert erase find count begin end '
+      + 'rbegin rend sort stable_sort reverse lower_bound upper_bound binary_search unique next_permutation min max min_element max_element swap abs memset fill '
+      + 'accumulate iota cin cout cerr endl getline ios sync_with_stdio tie greater less numeric_limits INT_MAX LLONG_MAX').split(' '),
+    c: ('int long double float char void const static struct return if else for while do switch case default break continue typedef sizeof '
+      + 'printf scanf puts gets fgets getchar putchar malloc calloc realloc free memset memcpy strlen strcmp strcpy strcat qsort abs INT_MAX').split(' '),
+    java: ('public private protected static final class interface void int long double float char boolean byte short String return if else for while do '
+      + 'switch case default break continue new null true false this super import throws throw try catch finally extends implements System out println '
+      + 'print printf BufferedReader InputStreamReader BufferedWriter OutputStreamWriter StringTokenizer StringBuilder IOException Integer parseInt Long '
+      + 'parseLong ArrayList List LinkedList HashMap Map TreeMap HashSet Set TreeSet ArrayDeque Deque Queue PriorityQueue Arrays Collections Math max min '
+      + 'abs append toString length size add get put remove contains containsKey isEmpty sort readLine nextToken hasMoreTokens Scanner nextInt nextLine').split(' '),
+    py: ('def return if elif else for while in not and or is None True False import from as class pass break continue lambda try except finally with '
+      + 'yield global nonlocal print input range len int str float list dict set tuple map filter sorted reversed sum min max abs enumerate zip '
+      + 'append extend pop insert remove sort join split strip rstrip readline sys stdin collections deque heapq heappush heappop defaultdict '
+      + 'Counter itertools permutations combinations math sqrt inf setrecursionlimit').split(' '),
+  };
+
+  function hintSource(c) {
+    const cur = c.getCursor();
+    const m = /[A-Za-z_]\w*$/.exec(c.getLine(cur.line).slice(0, cur.ch));
+    if (!m) return null;
+    const prefix = m[0];
+    const words = new Set(KEYWORDS[currentInfo().family] || []);
+    // 지금 코드에 나온 이름들도 후보로 (너무 긴 파일은 앞부분만)
+    const text = c.getValue().slice(0, 200000);
+    for (const w of text.match(/[A-Za-z_]\w{2,}/g) || []) words.add(w);
+    const list = [...words]
+      .filter((w) => w !== prefix && w.startsWith(prefix))
+      .sort((a, b) => a.length - b.length || a.localeCompare(b))
+      .slice(0, 40);
+    return list.length ? { list, from: CM.Pos(cur.line, cur.ch - prefix.length), to: cur } : null;
+  }
+
+  function showHints(c, auto) {
+    if (!CM.showHint) return;
+    c.showHint({
+      hint: hintSource,
+      completeSingle: !auto,
+      container: ui.panel,
+      closeCharacters: /[\s()[\]{};:>,.=+\-*/&|!?<"']/,
+    });
+  }
+
+  function onInputRead(c, change) {
+    if (!settings.autocomplete || c.state.completionActive) return;
+    if (change.origin !== '+input' || !/^[A-Za-z_0-9]$/.test(change.text[0] || '')) return;
+    const cur = c.getCursor();
+    const tok = c.getTokenAt(cur);
+    if (tok.type && /comment|string|meta/.test(tok.type)) return;
+    const w = /[A-Za-z_]\w*$/.exec(c.getLine(cur.line).slice(0, cur.ch));
+    if (!w || w[0].length < 2) return;
+    showHints(c, true);
   }
 
   // ───────── 터미널 ─────────
@@ -478,6 +749,7 @@
     if (runner.state !== 'on' || !runner.info) return false;
     const kind = currentInfo().kind;
     if (kind === 'python') return true;
+    if (kind === 'java') return !!runner.info.javac;
     return kind === 'c' ? !!runner.info.gcc : !!runner.info.gpp;
   }
   async function useLocal() {
@@ -505,12 +777,16 @@
     if (runner.state === 'unknown') {
       text = '실행 위치 확인 중…'; cls = ''; title = '';
     } else if (localReady()) {
-      const tool = kind === 'python' ? `Python ${runner.info.python}` : (kind === 'c' ? runner.info.gcc : runner.info.gpp);
+      const tool = kind === 'python' ? `Python ${runner.info.python}`
+        : kind === 'java' ? runner.info.javac : (kind === 'c' ? runner.info.gcc : runner.info.gpp);
       text = '● 내 PC'; cls = 'local';
       title = `내 PC에서 실행해요 (${tool}). 아래 칸에서 터미널처럼 입력을 주고받을 수 있어요.`;
     } else if (runner.state === 'on') {
-      text = '● Wandbox (C/C++ 컴파일러 없음)'; cls = 'remote';
-      title = '내 PC에 gcc/g++가 없어서 C/C++은 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 gcc를 설치할 수 있어요.';
+      const java = kind === 'java';
+      text = java ? '● Wandbox (JDK 없음)' : '● Wandbox (C/C++ 컴파일러 없음)'; cls = 'remote';
+      title = java
+        ? '내 PC에 Java(JDK)가 없어서 Java는 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 JDK를 설치할 수 있어요.'
+        : '내 PC에 gcc/g++가 없어서 C/C++은 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 gcc를 설치할 수 있어요.';
     } else {
       text = '● Wandbox'; cls = 'remote';
       title = '내 PC 실행 도우미가 설치되지 않아 Wandbox(온라인)에서 실행해요. 누르면 다시 확인하고, 그래도 없으면 설치 방법을 열어요.';
@@ -557,7 +833,8 @@
     if (first.compileError && first.status !== '0' && /\berror\b/.test(first.compileError) && !first.stdout) {
       return { where: 'Wandbox', cmd: commandLine(first, info), compileError: first.compileError };
     }
-    const rest = await Promise.all(inputs.slice(1).map((s) => execute(s)));
+    // 서버에 한꺼번에 몰리지 않게 동시에 3개까지만 보낸다
+    const rest = await mapLimit(inputs.slice(1), 3, (s) => execute(s));
     return {
       where: 'Wandbox',
       cmd: commandLine(first, info),
@@ -571,19 +848,27 @@
   async function runSamples() {
     if (running) return;
     if (live) stopLive();
-    const list = samples();
+    // 문제 예제 + 켜 둔 나만의 테스트케이스
+    const list = [
+      ...samples().map((s) => ({ label: `예제 ${s.n}`, input: s.input, expected: s.expected })),
+      ...cases.map((c, i) => ({ c, i })).filter(({ c }) => c.on !== false && (c.input || c.expected))
+        .map(({ c, i }) => ({ label: `내 케이스 ${i + 1}`, input: c.input || '', expected: (c.expected || '').trim() ? c.expected : null, mine: true })),
+    ];
     if (!list.length) {
       showTab('term');
-      termAppend(line('warn', '이 문제에는 예제가 없어요. 아래 칸에서 직접 실행해 주세요.'));
+      termAppend(line('warn', '이 문제에는 예제가 없어요. 테스트케이스 탭에서 케이스를 추가하거나, 아래 칸에서 직접 실행해 주세요.'));
       ui.termIn.focus();
       return;
     }
+    const nSample = list.filter((x) => !x.mine).length;
+    const nMine = list.length - nSample;
+    const what = [nSample ? `예제 ${nSample}개` : '', nMine ? `내 케이스 ${nMine}개` : ''].filter(Boolean).join(' + ');
     running = true;
     ui.btnRun.disabled = true;
     showTab('term');
     saveDraft(false);
     ui.termOut.textContent = '';
-    termAppend(line('info', `${currentLang().name} · 예제 ${list.length}개 실행 중…`));
+    termAppend(line('info', `${currentLang().name} · ${what} 실행 중…`));
     setStatus('실행 중…', 'busy');
 
     const out = await runInputs(list.map((s) => s.input));
@@ -601,7 +886,7 @@
       list.forEach((s, i) => {
         const res = out.results[i] || { stdout: '', stderr: '', note: '결과 없음' };
         let verdict, kind;
-        if (s.expected == null) { verdict = '출력 확인 필요'; kind = 'warn'; }
+        if (s.expected == null) { verdict = res.note || '출력만 확인'; kind = res.note ? 'err' : 'warn'; }
         else {
           judged++;
           const ok = !res.note && normalize(res.stdout) === normalize(s.expected);
@@ -609,10 +894,12 @@
           else { verdict = res.note || '틀림'; kind = 'err'; }
         }
         const time = res.ms != null ? `  (${(res.ms / 1000).toFixed(2)}초)` : '';
-        termAppend(line(kind, `${kind === 'ok' ? '✔' : kind === 'err' ? '✘' : '•'} 예제 ${s.n} — ${verdict}${time}`));
-        if (kind !== 'ok') {
+        termAppend(line(kind, `${kind === 'ok' ? '✔' : kind === 'err' ? '✘' : '•'} ${s.label} — ${verdict}${time}`));
+        if (kind === 'err' && s.expected != null && !res.note) {
+          termAppend(diffView(s, res)); // 어디가 다른지
+        } else if (kind !== 'ok') {
           termAppend(h('div', { class: 'tgrid' },
-            block('입력', s.input.replace(/\n$/, '')),
+            block('입력', String(s.input).replace(/\n$/, '')),
             s.expected != null ? block('기대 출력', s.expected.replace(/\n$/, '')) : null,
             block('내 출력', res.stdout.replace(/\n$/, ''), kind === 'err' ? 'err' : '')));
         }
@@ -620,10 +907,11 @@
       });
       if (judged) {
         const all = passed === judged;
+        const unit = nMine ? '케이스' : '예제';
         termAppend(line(all ? 'ok big' : 'err big', all
-          ? `예제 ${judged}개 모두 맞았어요! 🎉`
-          : `예제 ${judged}개 중 ${passed}개 맞음`));
-        setStatus(all ? '예제 통과' : `예제 ${passed}/${judged}`, all ? 'ok' : 'err');
+          ? `${unit} ${judged}개 모두 맞았어요! 🎉`
+          : `${unit} ${judged}개 중 ${passed}개 맞음`));
+        setStatus(all ? (nMine ? '모두 통과' : '예제 통과') : `${passed}/${judged} 통과`, all ? 'ok' : 'err');
       } else {
         setStatus('실행 완료', '');
       }
@@ -839,6 +1127,10 @@
       j.memory ? h('span', { text: `메모리 ${j.memory}` }) : null,
       j.time ? h('span', { text: `시간 ${j.time}` }) : null,
       j.id ? h('a', { href: `/source/${j.id}`, target: '_blank', text: '코드 보기' }) : null));
+    if (done && j.key === 'ac') {
+      const t = onSolved(); // 타이머를 멈추고 풀이 시간을 남긴다
+      if (t != null) ui.card.lastChild.append(h('span', { class: 'solved-time', text: `⏱ 풀이 시간 ${fmtTime(t)}` }));
+    }
     setStatus(done ? j.text : '채점 중…', done ? (j.key === 'ac' ? 'ok' : 'err') : 'busy');
   }
 
@@ -854,7 +1146,7 @@
     const found = (list || []).filter((l) => l && l.id !== '' && langInfo(l.name));
     if (!found.length) return;
     const prevName = langs.length ? currentLang().name : null;
-    const order = (l) => ['cpp', 'c', 'py'].indexOf(langInfo(l.name).family);
+    const order = (l) => ['cpp', 'c', 'java', 'py'].indexOf(langInfo(l.name).family);
     langs = found.sort((a, b) => order(a) - order(b));
     const same = langs.find((l) => l.name === prevName) || langs.find((l) => l.id === langId) || langs[0];
     langId = same.id;
@@ -876,7 +1168,9 @@
       langId = (langs.find((l) => l.id === last.lastLangId) || langs.find((l) => l.name === last.lastLangName) || langs[0]).id;
       renderLangs();
       await loadDraft();
+      await loadCases();
     }
+    await loadTimer();
     document.documentElement.classList.add('cboj-open');
     ui.panel.hidden = false;
     applyLayout();
@@ -888,6 +1182,7 @@
     isOpen = false;
     saveDraft(false);
     if (live) stopLive();
+    clearInterval(tmTick); // 닫혀 있는 동안 화면 갱신만 멈춘다 (시간은 계속 흐름)
     document.documentElement.classList.remove('cboj-open');
     ui.panel.hidden = true;
     toggleBtn.classList.remove('active');
@@ -897,7 +1192,7 @@
   // 문제 제목 옆 버튼 + 오른쪽 가장자리 손잡이
   const toggleBtn = h('button', { type: 'button', class: 'btn btn-primary cboj-toggle', title: '코드 작성 화면 열기/닫기 (Alt+C)', text: '⇆ 코드 작성' });
   toggleBtn.addEventListener('click', toggle);
-  const group = $('.problem-button');
+  const group = BOJ.titleButtons();
   if (group) group.prepend(toggleBtn);
   else {
     toggleBtn.classList.add('floating');
