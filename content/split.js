@@ -294,11 +294,13 @@
   // 엔터 자동 들여쓰기: VS Code의 언어별 규칙을 따른다.
   // - C/C++ : 줄이 닫히지 않은 '{' 또는 '('로 끝나면 한 단계 들여쓰기, 그 밖에는 같은 깊이
   //           (';'가 빠진 줄이나 'if (x)' 다음 줄도 같은 깊이)
+  //           'case 1:' / 'default:' 다음 줄도 들여쓰기 (VS Code C/C++ 확장 규칙)
   // - Python: 'def/if/for/while/else…'로 시작해 ':'로 끝나거나, 열린 괄호로 끝나면 들여쓰기
   //           'return/pass/break/continue/raise' 다음 줄은 한 단계 내어쓰기
   // - 괄호 쌍 사이( {|}, (|), [|] )에서 누르면 가운데 줄을 만들고 닫는 괄호는 원래 깊이로
   const VSC = {
     cIncrease: /^.*\{[^}"']*$|^.*\([^)"']*$/,
+    cCase: /^\s*(?:case\b.*|default\s*):\s*$/,
     pyIncrease: /^\s*(?:def|class|for|if|elif|else|while|try|with|finally|except|async|match|case)\b.*:\s*(#.*)?$/,
     pyBracket: /[([{]\s*(#.*)?$/,
     pyOutdent: /^\s*(?:pass|break|continue|raise\b.*|return\b.*)\s*(#.*)?$/,
@@ -320,7 +322,7 @@
     if (py) {
       if (VSC.pyIncrease.test(before) || VSC.pyBracket.test(before)) indent = base + unit;
       else if (VSC.pyOutdent.test(before)) indent = outdent(base);
-    } else if (VSC.cIncrease.test(beforeCode)) {
+    } else if (VSC.cIncrease.test(beforeCode) || VSC.cCase.test(beforeCode)) {
       indent = base + unit;
     }
 
