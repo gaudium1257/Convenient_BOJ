@@ -7,7 +7,7 @@
 1. 개발자 계정 등록 (처음 한 번, 등록비 5달러) → 2단계 인증 켜기
 2. **새 항목** → 최신 릴리스의 `Convenient_BOJ-webstore.zip` 업로드
 3. 업로드하면 확장 ID가 정해져요 (대시보드 주소와 항목 정보에 보여요)
-   - 그 ID를 `host/install.ps1` 의 `$ExtensionIds` 에 추가하고 새 버전을 릴리스해요
+   - 그 ID를 `host/install.ps1` 의 `$ExtensionIds` 에 추가하고 새 버전을 릴리스해요 (완료: `pljhagfdkkdpgjmkkdpalhdihpopjgem`, v1.6.1)
    - 그래야 스토어 버전도 내 PC 실행 도우미에 연결돼요 (스토어에 올린 ZIP은 다시 올릴 필요 없어요)
 4. 아래 **스토어 등록정보 / 개인정보 보호 관행** 탭을 채우고 이미지를 올려요
 5. **검토를 위해 제출** → 보통 며칠 걸려요. `nativeMessaging` 권한이 있어 조금 더 걸릴 수 있어요

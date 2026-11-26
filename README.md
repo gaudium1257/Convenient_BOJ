@@ -20,7 +20,7 @@
 ## 설치
 
 ### 크롬 웹 스토어
-준비 중이에요. 등록되면 여기에 링크를 올릴게요.
+심사 중이에요. 공개되면 [크롬 웹 스토어](https://chromewebstore.google.com/detail/pljhagfdkkdpgjmkkdpalhdihpopjgem)에서 바로 설치할 수 있어요.
 
 ### ZIP으로 직접 설치
 1. [Releases](https://github.com/gaudium1257/Convenient_BOJ/releases/latest)에서 **Convenient_BOJ.zip** 을 내려받아 압축을 풀어요.
@@ -195,7 +195,7 @@ git tag v1.0.1; git push origin v1.0.1
 | `Convenient_BOJ-helper.zip` | 도우미만 (웹 스토어 사용자용, 팝업의 [도우미 받기]가 받는 파일) |
 | `Convenient_BOJ-webstore.zip` | 크롬 웹 스토어 업로드용 (`key`와 도우미 제외) |
 
-웹 스토어 등록 문구·스크린샷·권한 사유는 [docs/store/LISTING.md](docs/store/LISTING.md)에 있어요. 웹 스토어에 처음 올리면 스토어가 새 확장 ID를 줘요. 그 ID를 `host/install.ps1` 의 `$ExtensionIds` 에 추가하고 새 버전을 배포해야 스토어 버전도 내 PC 실행 도우미에 연결돼요.
+웹 스토어 등록 문구·스크린샷·권한 사유는 [docs/store/LISTING.md](docs/store/LISTING.md)에 있어요. 실행 도우미는 `host/install.ps1` 의 `$ExtensionIds` 에 있는 확장만 받아요. 지금은 ZIP 버전(`mabfdomb…`)과 웹 스토어 버전(`pljhagfd…`) 두 가지예요.
 
 ## 만든 사람
 

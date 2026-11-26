@@ -18,9 +18,10 @@ $ErrorActionPreference = 'Stop'
 $HostName = 'com.convenient_boj.runner'
 # 도우미를 쓸 수 있는 확장 ID 목록
 #  - mabfdomb… : 저장소(ZIP)에서 개발자 모드로 설치한 버전 (manifest.json의 key로 고정)
-#  - 크롬 웹 스토어에 등록하면 스토어가 다른 ID를 준다 → 그 ID를 아래에 추가한다
+#  - pljhagfd… : 크롬 웹 스토어 버전 (스토어가 준 ID)
 $ExtensionIds = @(
-  'mabfdombglhmfnjklbnoglebinejifdi'
+  'mabfdombglhmfnjklbnoglebinejifdi',
+  'pljhagfdkkdpgjmkkdpalhdihpopjgem'
 )
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Dest = Join-Path $env:LOCALAPPDATA 'ConvenientBOJ'
