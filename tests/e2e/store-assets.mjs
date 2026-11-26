@@ -184,7 +184,7 @@ function captioned(title, sub, inner) {
 }
 const full = (p) => `<img src="${dataUri(p)}" style="display:block;width:1280px;height:720px">`;
 
-await render('screenshot-1.png', 1280, 800, captioned('문제 옆에서 바로 코드 작성 · 실행', 'C · C++ · Java · Rust · Python · PyPy3 — 예제를 돌려 기대 출력과 비교해요', full(shot1)));
+await render('screenshot-1.png', 1280, 800, captioned('문제 옆에서 바로 코드 작성 · 실행', '예제와 나만의 테스트케이스로 돌려 기대 출력과 비교해요', full(shot1)));
 await render('screenshot-2.png', 1280, 800, captioned('틀리면 어느 줄이 다른지 한눈에', '예제 + 나만의 테스트케이스로 채점하고, 다른 줄을 강조해서 보여 줘요', full(shot2)));
 await render('screenshot-3.png', 1280, 800, captioned('VS Code 같은 진짜 터미널', '내 PC 실행 도우미(선택)를 설치하면 실행 중에 입력을 주고받아요', full(shot3)));
 await render('screenshot-4.png', 1280, 800, captioned('점(.)만 쳐도 뜨는 자동완성', '많이 쓰는 멤버부터 · 내 코드의 이름 먼저 · 글자를 건너뛰어도 찾아요', full(shot4)));
@@ -205,7 +205,7 @@ await render('promo-marquee-1400x560.png', 1400, 560, `<div style="width:1400px;
     <div style="display:flex;align-items:center;gap:18px"><img src="${icon}" style="width:76px;height:76px;border-radius:17px;box-shadow:0 0 0 2px rgba(255,255,255,.5),0 10px 26px rgba(28,22,38,.35)">
       <div style="font-size:44px;font-weight:800;letter-spacing:-1px">Convenient BOJ</div></div>
     <div style="font-size:30px;font-weight:700;margin-top:30px;line-height:1.35">문제 · 코드 · 실행 · 제출을<br>한 화면에서</div>
-    <div style="font-size:17px;color:${BRAND.light};margin-top:18px;line-height:1.6">C · C++ · Java · Rust · Python · PyPy3<br>백준과 같은 컴파일 옵션 · 실시간 채점 결과</div>
+    <div style="font-size:17px;color:${BRAND.light};margin-top:18px;line-height:1.6">백준과 같은 컴파일 옵션으로 실행하고<br>채점 결과를 실시간으로 확인해요</div>
     <div style="margin-top:34px">${signature(16)}</div>
   </div>
   <img src="${dataUri(shot1)}" style="width:740px;border-radius:12px;box-shadow:0 20px 60px rgba(28,22,38,.45)"></div>`);
