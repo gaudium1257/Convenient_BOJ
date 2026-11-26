@@ -608,19 +608,148 @@
       + 'Counter itertools permutations combinations math sqrt inf setrecursionlimit').split(' '),
   };
 
+  // 예약어: 점(.)·->·:: 뒤에는 올 수 없어서 그 자리에서는 후보에서 뺀다
+  const RESERVED = {
+    cpp: 'int long double float char bool void auto const static struct class public private protected return if else for while do switch case default '
+      + 'break continue true false nullptr namespace using template typename unsigned signed short inline virtual operator new delete this sizeof typedef',
+    c: 'int long double float char void const static struct return if else for while do switch case default break continue typedef sizeof unsigned signed short',
+    java: 'public private protected static final class interface void int long double float char boolean byte short return if else for while do switch case '
+      + 'default break continue new null true false this super import throws throw try catch finally extends implements',
+    rust: 'fn let mut const static struct enum impl trait pub use mod crate super self match if else loop while for in break continue return as ref move where type true false',
+    py: 'def return if elif else for while in not and or is None True False import from as class pass break continue lambda try except finally with yield global nonlocal',
+  };
+  // 점(.) 뒤에 자주 오는 이름. 앞에 있을수록 먼저 보여 준다 (타입을 모르니 많이 쓰는 순서로)
+  const MEMBERS = {
+    cpp: 'push_back size begin end first second pop_back emplace_back empty clear insert erase find count front back push pop top length substr resize '
+      + 'assign reserve at emplace rbegin rend lower_bound upper_bound c_str',
+    c: '',
+    java: 'println print printf out in append toString length size add get put remove contains containsKey getOrDefault isEmpty readLine nextToken '
+      + 'hasMoreTokens parseInt valueOf charAt substring equals split write flush close offer poll peek keySet values entrySet sort max min abs nextInt nextLine next',
+    rust: 'unwrap push len iter collect map parse into_iter iter_mut get insert remove pop is_empty contains sort sort_unstable reverse clone to_string '
+      + 'chars bytes trim as_str next enumerate rev zip fold sum min max filter entry or_insert lock read_to_string read_line split_ascii_whitespace '
+      + 'split_whitespace expect windows new with_capacity from',
+    py: 'append split join strip rstrip readline stdin stdout write pop popleft appendleft extend insert remove sort keys values items get count index find '
+      + 'replace upper lower startswith endswith add discard update heappush heappop heapify sqrt inf deque defaultdict Counter permutations combinations '
+      + 'setrecursionlimit',
+  };
+  const wordSet = (s) => new Set(s ? s.split(' ') : []);
+  const reservedOf = {}, membersOf = {};
+  for (const k in KEYWORDS) { reservedOf[k] = wordSet(RESERVED[k]); membersOf[k] = (MEMBERS[k] || '').split(' ').filter(Boolean); }
+
+  // 커서 앞이 점(.)/->/:: 뒤인지
+  function hintContext(before) {
+    if (/::$/.test(before)) return 'scope';
+    if (/->$/.test(before)) return 'member';
+    // 1.5 같은 숫자의 점은 빼고, 이름·괄호 뒤의 점만
+    if (/[\w)\]]\.$/.test(before) && !/(?:^|[^\w.])\d+\.$/.test(before)) return 'member';
+    return 'plain';
+  }
+
+  // 글자를 건너뛰어도 찾기 (pb → push_back). 첫 글자는 같아야 한다. 맞은 글자 위치와 빈틈 점수를 돌려준다
+  function fuzzyMatch(word, q) {
+    const w = word.toLowerCase(), s = q.toLowerCase();
+    if (!s || w[0] !== s[0]) return null;
+    const idx = [0];
+    let j = 1, gaps = 0;
+    for (let i = 1; i < w.length && j < s.length; i++) {
+      if (w[i] !== s[j]) continue;
+      // _ 뒤나 대문자(낙타 표기)에서 맞으면 덜 감점
+      if (i !== idx[idx.length - 1] + 1) gaps += word[i - 1] === '_' || /[A-Z]/.test(word[i]) ? 0.5 : 1;
+      idx.push(i);
+      j++;
+    }
+    return j === s.length ? { gaps, idx } : null;
+  }
+
+  function renderHint(elt, _data, cur) {
+    const marks = new Set(cur.idx);
+    let run = '', bold = false;
+    const flush = () => {
+      if (!run) return;
+      elt.append(bold ? h('b', { class: 'cboj-hm', text: run }) : document.createTextNode(run));
+      run = '';
+    };
+    [...cur.text].forEach((ch, i) => {
+      if (marks.has(i) !== bold) { flush(); bold = marks.has(i); }
+      run += ch;
+    });
+    flush();
+  }
+
   function hintSource(c) {
     const cur = c.getCursor();
-    const m = /[A-Za-z_]\w*$/.exec(c.getLine(cur.line).slice(0, cur.ch));
-    if (!m) return null;
-    const prefix = m[0];
-    const words = new Set(KEYWORDS[currentInfo().family] || []);
-    // 지금 코드에 나온 이름들도 후보로 (너무 긴 파일은 앞부분만)
-    const text = c.getValue().slice(0, 200000);
-    for (const w of text.match(/[A-Za-z_]\w{2,}/g) || []) words.add(w);
-    const list = [...words]
-      .filter((w) => w !== prefix && w.startsWith(prefix))
-      .sort((a, b) => a.length - b.length || a.localeCompare(b))
-      .slice(0, 40);
+    const before = c.getLine(cur.line).slice(0, cur.ch);
+    const m = /[A-Za-z_]\w*$/.exec(before);
+    const prefix = m ? m[0] : '';
+    const ctx = hintContext(before.slice(0, before.length - prefix.length));
+    if (!prefix && ctx === 'plain') return null;
+
+    const fam = currentInfo().family;
+    const reserved = reservedOf[fam] || new Set();
+    const members = membersOf[fam] || [];
+    const memberRank = new Map(members.map((w, i) => [w, i]));
+    const lang = KEYWORDS[fam] || [];
+    const langRank = new Map(lang.map((w, i) => [w, i]));
+
+    // 지금 코드에 나온 이름(몇 번 나왔는지)과, 그중 점(.)·-> 뒤에 나온 이름 (너무 긴 파일은 앞부분만)
+    // #include 줄(bits/stdc++.h 의 .h 등)과 문자열 안은 빼고 센다
+    const lines = c.getValue().slice(0, 200000).split('\n')
+      .map((l) => (/^\s*#\s*include\b/.test(l) ? '' : l.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, '""')));
+    const text = lines.join('\n');
+    const used = new Map();
+    for (const w of text.match(/[A-Za-z_]\w{2,}/g) || []) used.set(w, (used.get(w) || 0) + 1);
+    // 커서가 있는 줄은 빼고 (System.out. 을 치는 중이면 그 out은 '다음에 칠 이름'이 아니다)
+    const usedAsMember = new Set();
+    const others = lines.filter((_, i) => i !== cur.line).join('\n');
+    for (const mm of others.matchAll(/(?:\.|->)\s*([A-Za-z_]\w*)/g)) usedAsMember.add(mm[1]);
+
+    // 어디서 온 후보인지에 따른 순위 (작을수록 먼저)
+    const rankOf = (w) => {
+      const inCode = used.has(w) && w !== prefix;
+      if (ctx === 'member') {
+        if (usedAsMember.has(w) && w !== prefix) return 0;
+        if (memberRank.has(w)) return 1;
+        return inCode ? 2 : 3;
+      }
+      if (ctx === 'scope') {
+        // std:: 뒤: 표준 라이브러리 이름(코드에 이미 썼어도) > 내 코드 이름 > 멤버 함수
+        if (langRank.has(w) && !memberRank.has(w)) return 0;
+        return inCode ? 1 : 2;
+      }
+      if (inCode) return 0;
+      return memberRank.has(w) ? 2 : 1;
+    };
+
+    const pool = new Set([...lang, ...members, ...used.keys()]);
+    if (!prefix) {
+      // 점 바로 뒤: 자주 쓰는 멤버 + 코드에서 점 뒤에 썼던 이름 / :: 바로 뒤: 타입·함수
+      pool.clear();
+      if (ctx === 'member') { for (const w of [...usedAsMember, ...members]) pool.add(w); } else { for (const w of lang) pool.add(w); }
+    }
+    const items = [];
+    for (const w of pool) {
+      if (w === prefix) continue;
+      if (ctx !== 'plain' && reserved.has(w)) continue;
+      let tier, gaps = 0, idx = [];
+      if (!prefix) tier = 0;
+      else if (w.startsWith(prefix)) { tier = 0; idx = [...prefix].map((_, i) => i); }
+      else if (prefix.length >= 2) {
+        const f = fuzzyMatch(w, prefix);
+        if (!f) continue;
+        tier = 1; gaps = f.gaps; idx = f.idx;
+      } else continue;
+      items.push({
+        text: w, idx, tier, gaps, rank: rankOf(w), n: used.get(w) || 0, render: renderHint,
+        mr: memberRank.has(w) ? memberRank.get(w) : 999,
+        lr: langRank.has(w) ? langRank.get(w) : 999,
+      });
+    }
+    // 점 뒤의 자주 쓰는 멤버, 그리고 글자를 아직 안 친 목록은 '많이 쓰는 순서'(목록 순서)로.
+    // 글자를 친 뒤에는 VS Code처럼 짧은 이름부터.
+    const curated = (a, b) => (ctx === 'member' && a.rank === 1 ? a.mr - b.mr : !prefix ? a.lr - b.lr : 0);
+    items.sort((a, b) => a.tier - b.tier || a.rank - b.rank || a.gaps - b.gaps || curated(a, b) || b.n - a.n
+      || a.text.length - b.text.length || a.text.localeCompare(b.text));
+    const list = items.slice(0, 40);
     return list.length ? { list, from: CM.Pos(cur.line, cur.ch - prefix.length), to: cur } : null;
   }
 
@@ -635,13 +764,30 @@
   }
 
   function onInputRead(c, change) {
-    if (!settings.autocomplete || c.state.completionActive) return;
-    if (change.origin !== '+input' || !/^[A-Za-z_0-9]$/.test(change.text[0] || '')) return;
+    if (!settings.autocomplete || change.origin !== '+input') return;
+    const typed = change.text[0] || '';
     const cur = c.getCursor();
     const tok = c.getTokenAt(cur);
     if (tok.type && /comment|string|meta/.test(tok.type)) return;
-    const w = /[A-Za-z_]\w*$/.exec(c.getLine(cur.line).slice(0, cur.ch));
-    if (!w || w[0].length < 2) return;
+    const before = c.getLine(cur.line).slice(0, cur.ch);
+    // VS Code처럼 점(.)·->·:: 를 치면 바로 목록을 연다.
+    // 같은 입력 처리 안에서 열면 '직전 글자가 닫는 문자'라 곧바로 닫히므로 처리가 끝난 뒤에 연다.
+    if (/^[.>:]$/.test(typed) && hintContext(before) !== 'plain') {
+      if (typed === ':' && !['cpp', 'rust'].includes(currentInfo().family)) return;
+      setTimeout(() => {
+        const now = c.getCursor();
+        if (now.line !== cur.line || now.ch !== cur.ch) return;
+        if (c.state.completionActive) c.state.completionActive.close();
+        showHints(c, true);
+      }, 0);
+      return;
+    }
+    if (c.state.completionActive || !/^[A-Za-z_0-9]$/.test(typed)) return;
+    const w = /[A-Za-z_]\w*$/.exec(before);
+    if (!w) return;
+    // 보통은 두 글자부터, 점(.)·->·:: 뒤에서는 한 글자부터
+    const afterDot = hintContext(before.slice(0, before.length - w[0].length)) !== 'plain';
+    if (w[0].length < (afterDot ? 1 : 2)) return;
     showHints(c, true);
   }
 

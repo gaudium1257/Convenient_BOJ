@@ -296,4 +296,7 @@ html.cboj-open .cboj-toggle.floating { display: none; }
 }
 #cboj-panel .CodeMirror-hint { margin: 0; padding: 1px 10px; color: var(--ink); border-radius: 0; white-space: pre; }
 #cboj-panel li.CodeMirror-hint-active { background: var(--blue); color: #fff; }
+/* 입력한 글자와 맞은 부분 (VS Code처럼 굵게) */
+#cboj-panel .CodeMirror-hint b.cboj-hm { font-weight: 700; color: var(--blue); }
+#cboj-panel li.CodeMirror-hint-active b.cboj-hm { color: #fff; }
 .cboj-case-cap { font-size: 11px; color: var(--muted); margin-bottom: 2px; }

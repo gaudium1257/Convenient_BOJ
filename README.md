@@ -33,7 +33,12 @@
   - Java: 백준 규칙(`public class Main`) + `BufferedReader` 빠른 입력
   - Rust: 입력을 한 번에 읽어 공백으로 나누고(`split_ascii_whitespace`), `BufWriter`로 모아서 출력하는 형태
   - Python: 빈 코드 (빠른 입력이 필요하면 `import sys` / `input = sys.stdin.readline` 을 추가해 두세요)
-- **자동완성**: 입력하면서 키워드·변수 이름 후보를 띄워요. Ctrl+Space로 언제든 열 수 있고, 팝업에서 끌 수 있어요.
+- **자동완성**: VS Code처럼 커서 아래에 후보 목록을 띄워요. ↑↓로 고르고 Enter/Tab으로 넣어요. Ctrl+Space로 언제든 열 수 있고, 팝업에서 끌 수 있어요.
+  - 이름을 두 글자 치면 뜨고, 점(`.`)·`->`·`::` 를 치면 바로 떠요 (`v.` → `push_back`, `size`, … / `std::` → `vector`, `string`, …)
+  - 점 뒤에는 `int`·`public` 같은 예약어를 빼고, 많이 쓰는 멤버 함수부터 보여 줘요
+  - 내 코드에 쓴 변수·함수 이름이 먼저 나와요
+  - 글자를 건너뛰어도 찾아요 (`pb` → `push_back`, `lb` → `lower_bound`). 맞은 글자는 굵게 표시돼요
+  - 타입을 분석하지는 않아서, VS Code처럼 그 변수의 타입에 맞는 함수만 골라 주지는 못해요
 - **풀이 타이머**: 툴바의 ⏱ 를 누르면 시작/일시정지, ↺ 로 초기화. **맞았습니다!!** 를 받으면 멈추고 풀이 시간을 결과에 같이 보여 줘요. 팝업에서 자동 시작을 켤 수 있어요.
 
 ![코드 작성 버튼](docs/screenshots/01-toggle-button.jpg)
