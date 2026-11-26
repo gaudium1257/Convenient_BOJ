@@ -30,12 +30,12 @@ jobs:
         run: |
           # 1) 직접 설치용: 압축을 풀어 '압축해제된 확장 프로그램'으로 로드 (확장 ID 고정용 key 포함, 도우미 포함)
           mkdir -p out/Convenient_BOJ
-          cp -r manifest.json background.js content popup shared icons vendor host out/Convenient_BOJ/
+          cp -r manifest.json LICENSE background.js content popup shared icons vendor host out/Convenient_BOJ/
           (cd out && zip -qr ../Convenient_BOJ.zip Convenient_BOJ)
           unzip -l Convenient_BOJ.zip
           # 2) 크롬 웹 스토어 업로드용: 스토어는 manifest의 key를 받지 않고, 도우미 파일도 필요 없다
           mkdir -p store
-          cp -r background.js content popup shared icons vendor store/
+          cp -r LICENSE background.js content popup shared icons vendor store/
           jq 'del(.key)' manifest.json > store/manifest.json
           (cd store && zip -qr ../Convenient_BOJ-webstore.zip .)
           unzip -l Convenient_BOJ-webstore.zip | tail -3

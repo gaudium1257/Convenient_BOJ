@@ -2,9 +2,11 @@
 #
 # 하는 일
 #   1. Python 확인 (없으면 winget으로 설치할지 물어봄)
+#      PyPy3 확인 (없으면 winget으로 PyPy 3.11 설치할지 물어봄, PyPy3를 안 쓰면 건너뛰어도 됨)
 #   2. C/C++ 컴파일러 gcc/g++ 확인 (없으면 winget으로 WinLibs 설치할지 물어봄)
 #   3. Java(JDK) 확인 (없으면 winget으로 Temurin JDK 21 설치할지 물어봄, Java를 안 쓰면 건너뛰어도 됨)
-#   4. 도우미를 %LOCALAPPDATA%\ConvenientBOJ 에 복사하고 크롬·엣지·웨일에 등록
+#   4. Rust(rustc) 확인 (없으면 winget으로 Rust GNU 판 설치할지 물어봄, Rust를 안 쓰면 건너뛰어도 됨)
+#   5. 도우미를 %LOCALAPPDATA%\ConvenientBOJ 에 복사하고 크롬·엣지·웨일에 등록
 #
 # 실행: install.bat 더블클릭, 또는
 #   powershell -ExecutionPolicy Bypass -File install.ps1 [-Yes]
@@ -78,6 +80,30 @@ function Find-Javac {
   return $null
 }
 
+function Find-Rustc {
+  $cmd = Get-Command rustc -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  $candidates = @("$env:USERPROFILE\.cargo\bin\rustc.exe")
+  foreach ($base in 'C:\Program Files', "$env:LOCALAPPDATA\Programs") {
+    $candidates += Get-ChildItem "$base\Rust*\bin\rustc.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  }
+  foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
+  return $null
+}
+
+function Find-PyPy {
+  foreach ($name in 'pypy3', 'pypy') {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+  }
+  $candidates = @("$env:LOCALAPPDATA\Microsoft\WinGet\Links\pypy3.exe")
+  $candidates += Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\PyPy.PyPy.3*\*\pypy3.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  $candidates += Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\PyPy.PyPy.3*\pypy3.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  $candidates += Get-ChildItem 'C:\pypy3*\pypy3.exe', "$env:LOCALAPPDATA\Programs\pypy3*\pypy3.exe" -ErrorAction SilentlyContinue | ForEach-Object FullName
+  foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
+  return $null
+}
+
 function Install-WithWinget($id, $label) {
   if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
     Write-Warn "winget이 없어서 $label 을(를) 자동으로 설치할 수 없어요. 직접 설치한 뒤 다시 실행해 주세요."
@@ -111,6 +137,18 @@ if (-not $python) {
 }
 Write-Ok "Python: $python"
 
+# 1-2) PyPy3 (백준 PyPy3로 제출할 때 내 PC에서도 PyPy로 실행)
+Write-Step 'PyPy3 확인'
+$pypy = Find-PyPy
+if (-not $pypy) {
+  Write-Warn 'PyPy3가 없어요. 언어를 PyPy3로 골랐을 때 내 PC에서 PyPy로 실행하려면 필요해요. (Python 3만 쓰면 없어도 돼요)'
+  if (Confirm-Action 'winget으로 PyPy 3.11(약 100MB)을 설치할까요?') {
+    Install-WithWinget 'PyPy.PyPy.3.11' 'PyPy 3.11' | Out-Null
+    $pypy = Find-PyPy
+  }
+}
+if ($pypy) { Write-Ok "PyPy3: $pypy" } else { Write-Warn 'PyPy3 없이 계속해요. PyPy3는 지금처럼 Wandbox(온라인)에서 실행돼요.' }
+
 # 2) gcc / g++
 Write-Step 'C/C++ 컴파일러(gcc/g++) 확인'
 $gpp = Find-Gpp
@@ -135,7 +173,20 @@ if (-not $javac) {
 }
 if ($javac) { Write-Ok "javac: $javac" } else { Write-Warn 'JDK 없이 계속해요. Java는 지금처럼 Wandbox(온라인)에서 실행돼요.' }
 
-# 4) 도우미 복사·등록
+# 4) Rust
+Write-Step 'Rust(rustc) 확인'
+$rustc = Find-Rustc
+if (-not $rustc) {
+  Write-Warn 'Rust가 없어요. Rust 코드를 내 PC에서 실행하려면 필요해요. (Rust를 안 쓰면 없어도 돼요)'
+  # GNU 판은 링커가 함께 들어 있어 Visual Studio 없이 바로 컴파일된다
+  if (Confirm-Action 'winget으로 Rust(GNU 판, 약 300MB)를 설치할까요?') {
+    Install-WithWinget 'Rustlang.Rust.GNU' 'Rust (GNU)' | Out-Null
+    $rustc = Find-Rustc
+  }
+}
+if ($rustc) { Write-Ok "rustc: $rustc" } else { Write-Warn 'Rust 없이 계속해요. Rust는 지금처럼 Wandbox(온라인)에서 실행돼요.' }
+
+# 5) 도우미 복사·등록
 Write-Step '도우미 설치'
 New-Item -ItemType Directory -Force -Path $Dest | Out-Null
 Copy-Item (Join-Path $Here 'cboj_host.py') $Dest -Force

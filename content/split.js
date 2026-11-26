@@ -17,14 +17,19 @@
     { id: '75', name: 'C11' }, { id: '0', name: 'C99' },
     { id: '28', name: 'Python 3' }, { id: '73', name: 'PyPy3' },
     { id: '93', name: 'Java 11' },
+    { id: '113', name: 'Rust 2021' },
   ];
   const TEMPLATES = globalThis.CBOJ_TEMPLATES;
   const useTabs = () => settings.indent !== 'space'; // 기본: 탭 문자로 들여쓰기
   const expandTemplate = globalThis.cbojExpandTemplate;
 
   function langInfo(name) {
-    if (/^(Python 3|PyPy3)/.test(name)) return { kind: 'python', family: 'py', mode: 'text/x-python' };
+    // PyPy3는 Python 3와 같은 코드·기본 코드를 쓰고, 실행만 PyPy로 한다
+    if (/^PyPy3/.test(name)) return { kind: 'python', family: 'py', pypy: true, mode: 'text/x-python' };
+    if (/^Python 3/.test(name)) return { kind: 'python', family: 'py', mode: 'text/x-python' };
     if (/^Java\b/.test(name)) return { kind: 'java', family: 'java', mode: 'text/x-java' };
+    const rust = /^Rust(?: (\d{4}))?/.exec(name);
+    if (rust) return { kind: 'rust', family: 'rust', edition: rust[1] || '2021', mode: 'rust' };
     let m = /^C\+\+(\d+)?/.exec(name);
     if (m) {
       const v = { 98: '98', '03': '03', 11: '11', 14: '14', 17: '17', 20: '20', 23: '23', 26: '2c' }[m[1] || '17'] || '17';
@@ -590,6 +595,11 @@
       + 'print printf BufferedReader InputStreamReader BufferedWriter OutputStreamWriter StringTokenizer StringBuilder IOException Integer parseInt Long '
       + 'parseLong ArrayList List LinkedList HashMap Map TreeMap HashSet Set TreeSet ArrayDeque Deque Queue PriorityQueue Arrays Collections Math max min '
       + 'abs append toString length size add get put remove contains containsKey isEmpty sort readLine nextToken hasMoreTokens Scanner nextInt nextLine').split(' '),
+    rust: ('fn let mut const static struct enum impl trait pub use mod crate self Self super match if else loop while for in break continue '
+      + 'return as ref move where type true false Some None Ok Err Option Result Vec String HashMap HashSet BTreeMap BTreeSet VecDeque BinaryHeap '
+      + 'Box Rc RefCell usize isize u8 u32 u64 i32 i64 i128 f64 bool char str std io collections Read Write BufWriter BufRead stdin stdout lock '
+      + 'read_to_string read_line split_ascii_whitespace split_whitespace parse unwrap expect push pop insert remove get len is_empty iter into_iter '
+      + 'map filter collect sum min max sort sort_unstable reverse contains entry or_insert clone to_string chars bytes writeln println print format').split(' '),
     py: ('def return if elif else for while in not and or is None True False import from as class pass break continue lambda try except finally with '
       + 'yield global nonlocal print input range len int str float list dict set tuple map filter sorted reversed sum min max abs enumerate zip '
       + 'append extend pop insert remove sort join split strip rstrip readline sys stdin collections deque heapq heappush heappop defaultdict '
@@ -658,7 +668,8 @@
   function commandLine(res, info) {
     if (!res.compiler) return '$ run';
     if (info.kind === 'python') return `$ ${res.compiler} main.py`;
-    return `$ ${res.compiler} ${(res.options || []).join(' ')} main.${info.kind === 'c' ? 'c' : 'cpp'}`;
+    const file = { c: 'main.c', java: 'Main.java', rust: 'main.rs' }[info.kind] || 'main.cpp';
+    return ['$', res.compiler, ...(res.options || []), file].join(' ');
   }
 
   function showRunFailure(res) {
@@ -747,9 +758,11 @@
   // 지금 언어를 이 PC에서 실행할 수 있는지
   function localReady() {
     if (runner.state !== 'on' || !runner.info) return false;
-    const kind = currentInfo().kind;
-    if (kind === 'python') return true;
+    const info = currentInfo();
+    const kind = info.kind;
+    if (kind === 'python') return info.pypy ? !!runner.info.pypy : true;
     if (kind === 'java') return !!runner.info.javac;
+    if (kind === 'rust') return !!runner.info.rustc;
     return kind === 'c' ? !!runner.info.gcc : !!runner.info.gpp;
   }
   async function useLocal() {
@@ -772,21 +785,27 @@
   function renderRunner() {
     if (!ui) return;
     const w = ui.where;
-    const kind = currentInfo().kind;
+    const info = currentInfo();
+    const kind = info.pypy ? 'pypy' : info.kind;
     let text, cls, title;
     if (runner.state === 'unknown') {
       text = '실행 위치 확인 중…'; cls = ''; title = '';
     } else if (localReady()) {
       const tool = kind === 'python' ? `Python ${runner.info.python}`
-        : kind === 'java' ? runner.info.javac : (kind === 'c' ? runner.info.gcc : runner.info.gpp);
+        : kind === 'pypy' ? runner.info.pypy
+        : kind === 'java' ? runner.info.javac : kind === 'rust' ? runner.info.rustc
+          : (kind === 'c' ? runner.info.gcc : runner.info.gpp);
       text = '● 내 PC'; cls = 'local';
       title = `내 PC에서 실행해요 (${tool}). 아래 칸에서 터미널처럼 입력을 주고받을 수 있어요.`;
     } else if (runner.state === 'on') {
-      const java = kind === 'java';
-      text = java ? '● Wandbox (JDK 없음)' : '● Wandbox (C/C++ 컴파일러 없음)'; cls = 'remote';
-      title = java
-        ? '내 PC에 Java(JDK)가 없어서 Java는 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 JDK를 설치할 수 있어요.'
-        : '내 PC에 gcc/g++가 없어서 C/C++은 Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 gcc를 설치할 수 있어요.';
+      // 언어별로 빠진 도구 안내
+      const missing = {
+        java: ['JDK 없음', 'Java(JDK)', 'Java는', 'JDK'],
+        rust: ['Rust 없음', 'Rust(rustc)', 'Rust는', 'Rust'],
+        pypy: ['PyPy 없음', 'PyPy', 'PyPy3는', 'PyPy'],
+      }[kind] || ['C/C++ 컴파일러 없음', 'gcc/g++', 'C/C++은', 'gcc'];
+      text = `● Wandbox (${missing[0]})`; cls = 'remote';
+      title = `내 PC에 ${missing[1]}가 없어서 ${missing[2]} Wandbox(온라인)에서 실행해요. 도우미 설치 스크립트(install.bat)를 다시 실행하면 ${missing[3]}를 설치할 수 있어요.`;
     } else {
       text = '● Wandbox'; cls = 'remote';
       title = '내 PC 실행 도우미가 설치되지 않아 Wandbox(온라인)에서 실행해요. 누르면 다시 확인하고, 그래도 없으면 설치 방법을 열어요.';
@@ -1146,7 +1165,7 @@
     const found = (list || []).filter((l) => l && l.id !== '' && langInfo(l.name));
     if (!found.length) return;
     const prevName = langs.length ? currentLang().name : null;
-    const order = (l) => ['cpp', 'c', 'java', 'py'].indexOf(langInfo(l.name).family);
+    const order = (l) => ['cpp', 'c', 'java', 'rust', 'py'].indexOf(langInfo(l.name).family);
     langs = found.sort((a, b) => order(a) - order(b));
     const same = langs.find((l) => l.name === prevName) || langs.find((l) => l.id === langId) || langs[0];
     langId = same.id;

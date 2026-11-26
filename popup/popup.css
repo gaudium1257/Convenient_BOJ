@@ -97,4 +97,4 @@ h2 { margin: 0; font-size: 13px; font-weight: 700; }
 .card > .row.runner + .toggle { border-top: 1px dashed var(--line); }
 
 /* 기본 코드 언어 탭 4개가 들어가도록 */
-.tpl .seg button { padding: 5px 8px; }
+.tpl .seg button { padding: 5px 6px; font-size: 12px; }

@@ -31,13 +31,14 @@
   - C++: 백준 권장 빠른 입출력(`ios::sync_with_stdio(false); cin.tie(nullptr);`)이 들어간 형태
   - C: `stdio.h` + `main` 뼈대
   - Java: 백준 규칙(`public class Main`) + `BufferedReader` 빠른 입력
+  - Rust: 입력을 한 번에 읽어 공백으로 나누고(`split_ascii_whitespace`), `BufWriter`로 모아서 출력하는 형태
   - Python: 빈 코드 (빠른 입력이 필요하면 `import sys` / `input = sys.stdin.readline` 을 추가해 두세요)
 - **자동완성**: 입력하면서 키워드·변수 이름 후보를 띄워요. Ctrl+Space로 언제든 열 수 있고, 팝업에서 끌 수 있어요.
 - **풀이 타이머**: 툴바의 ⏱ 를 누르면 시작/일시정지, ↺ 로 초기화. **맞았습니다!!** 를 받으면 멈추고 풀이 시간을 결과에 같이 보여 줘요. 팝업에서 자동 시작을 켤 수 있어요.
 
 ![코드 작성 버튼](docs/screenshots/01-toggle-button.jpg)
 
-### ▶ 실행: C / C++ / Java / Python
+### ▶ 실행: C / C++ / Java / Rust / Python
 - **실행**(Ctrl + Enter)을 누르면 결과 창이 **터미널**로 바뀌고, 문제의 **예제 + 나만의 테스트케이스**로 코드를 돌려 기대 출력과 비교해요.
   - 틀리면 **몇 번째 줄부터 다른지**, 줄 수가 모자란지·남는지, 공백만 다른지를 알려 주고 다른 줄을 강조해서 보여 줘요.
   - 컴파일 에러, 런타임 에러, 시간 초과, stderr도 그대로 보여 줘요.
@@ -46,9 +47,9 @@
   - [내 PC 실행 도우미](#2단계-내-pc에서-실행-진짜-터미널-선택)를 설치했다면 **VS Code 터미널처럼** 동작해요. 프로그램이 실행 중일 때 입력하고 Enter를 치면 바로 전달돼요. Ctrl+C로 중지, Ctrl+D로 입력 끝.
   - 설치하지 않았다면 입력을 미리 적고 **이 입력으로 실행**을 누르면, 끝난 뒤 결과를 한꺼번에 보여 줘요(Wandbox).
 - 터미널 탭 오른쪽 위에 지금 **실행 위치**(● 내 PC / ● Wandbox)가 보여요.
-- 언어 목록은 백준 [언어 설정]에서 고른 언어를 따라요. C(C99/C11/…), C++(C++14/17/20/…, Clang 포함), Java(8/11/…), Python 3 / PyPy3 를 지원해요.
-- 컴파일·실행 옵션은 백준과 맞췄어요: C/C++ `-O2 -std=<버전> -DONLINE_JUDGE` (C는 `-lm`), Java `-Xss512m -DONLINE_JUDGE=1`
-  - 내 PC 실행 때 윈도우 기본 스택(1MB)은 백준보다 훨씬 작아서, C/C++은 스택을 256MB로 키워 깊은 재귀도 백준처럼 돌아가게 했어요.
+- 언어 목록은 백준 [언어 설정]에서 고른 언어를 따라요. C(C99/C11/…), C++(C++14/17/20/…, Clang 포함), Java(8/11/…), Rust(2018/2021/…), Python 3 / PyPy3 를 지원해요. PyPy3를 고르면 실행도 PyPy로 해요(Python 3와 코드·기본 코드는 같이 써요).
+- 컴파일·실행 옵션은 백준과 맞췄어요: C/C++ `-O2 -std=<버전> -DONLINE_JUDGE` (C는 `-lm`), Java `-Xss512m -DONLINE_JUDGE=1`, Rust `rustc --edition <에디션> -O`
+  - 내 PC 실행 때 윈도우 기본 스택(1MB)은 백준보다 훨씬 작아서, C/C++·Rust는 스택을 256MB로 키워 깊은 재귀도 백준처럼 돌아가게 했어요.
 - Wandbox(온라인)가 바쁘거나 잠깐 끊기면 자동으로 두 번까지 다시 시도해요.
 
 | 예제 통과 | 예제 틀림 | 컴파일 에러 (어두운 테마) |
@@ -91,12 +92,14 @@
 1. 압축을 푼 폴더의 **`host\install.bat`** 을 더블클릭해요.
 2. 묻는 대로 답해요. (모두 Enter = 예)
    - Python이 없으면 설치할지 물어봐요. (도우미가 Python으로 동작해요)
+   - PyPy3가 없으면 PyPy 3.11을 설치할지 물어봐요. (약 100MB, PyPy3로 제출할 때만 필요해요)
    - C/C++ 컴파일러(gcc/g++)가 없으면 WinLibs를 설치할지 물어봐요. (약 250MB, 안 쓰는 언어면 건너뛰어도 돼요)
    - Java(JDK)가 없으면 Temurin JDK 21을 설치할지 물어봐요. (약 200MB)
+   - Rust가 없으면 Rust(GNU 판)를 설치할지 물어봐요. (약 300MB, Visual Studio 없이 바로 컴파일돼요)
 3. 백준 문제 탭을 새로고침하면 터미널 탭 오른쪽 위가 **● 내 PC** 로 바뀌어요.
 
 - 관리자 권한은 필요 없어요. 도우미는 `%LOCALAPPDATA%\ConvenientBOJ` 에 설치되고 크롬·엣지·웨일에 등록돼요.
-- 지우려면 `host\uninstall.bat` 을 실행해요. (Python·gcc는 지우지 않아요)
+- 지우려면 `host\uninstall.bat` 을 실행해요. (Python·PyPy·gcc·JDK·Rust는 지우지 않아요)
 - 도우미를 설치하지 않은 PC에서는 지금처럼 Wandbox로 실행돼요.
 
 ### 업데이트
@@ -151,3 +154,9 @@ vendor/codemirror/       CodeMirror 5 (MIT)
 docs/screenshots/        실제 동작 캡처
 .github/workflows/       태그를 올리면 Releases에 ZIP 배포
 ```
+
+## 라이선스
+
+[MIT](LICENSE) © gaudium1257
+
+- 코드 에디터로 [CodeMirror 5](https://codemirror.net/5/)(MIT)를 씁니다. 라이선스는 `vendor/codemirror/LICENSE` 에 있어요.

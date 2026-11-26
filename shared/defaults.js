@@ -16,6 +16,10 @@ globalThis.CBOJ_TEMPLATES = Object.freeze({
   // 백준 Java 규칙: public class Main. 빠른 입력은 BufferedReader가 백준에서 흔한 형태
   java: 'import java.io.*;\nimport java.util.*;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n'
     + '        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));\n        $0\n    }\n}\n',
+  // 입력을 한 번에 읽어 공백으로 나누고, BufWriter로 모아서 출력하는 백준에서 흔한 형태
+  rust: 'use std::io::{self, Read, Write};\n\nfn main() {\n    let mut input = String::new();\n'
+    + '    io::stdin().read_to_string(&mut input).unwrap();\n    let mut it = input.split_ascii_whitespace();\n'
+    + '    let mut out = io::BufWriter::new(io::stdout().lock());\n\n    $0\n}\n',
   py: '', // 파이썬은 보통 기본 코드 없이 시작한다 (빠른 입력이 필요하면 팝업에서 추가)
 });
 

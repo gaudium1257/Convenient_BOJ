@@ -26,7 +26,7 @@ import tempfile
 import threading
 import time
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 IS_WIN = os.name == 'nt'
 NO_WINDOW = 0x08000000 if IS_WIN else 0  # CREATE_NO_WINDOW: 콘솔 창이 뜨지 않게
 OUT_LIMIT = 2_000_000                    # 실시간 출력 최대 바이트 (넘으면 종료)
@@ -86,11 +86,31 @@ def _search_path():
                 for name in sorted(os.listdir(base), reverse=True):
                     if 'jdk' in name.lower():
                         dirs.append(os.path.join(base, name, 'bin'))
+        # Rust: rustup(%USERPROFILE%\.cargo\bin), 독립 설치판(C:\Program Files\Rust ...)
+        dirs.append(os.path.join(os.path.expanduser('~'), '.cargo', 'bin'))
+        for base in (r'C:\Program Files', os.path.join(local, 'Programs')):
+            if os.path.isdir(base):
+                for name in sorted(os.listdir(base), reverse=True):
+                    if name.lower().startswith('rust'):
+                        dirs.append(os.path.join(base, name, 'bin'))
+        # PyPy: 압축을 푼 폴더를 그대로 쓰는 경우가 많다 (C:\pypy3.11-..., %LOCALAPPDATA%\Programs\pypy...)
+        for base in ('C:\\', os.path.join(local, 'Programs')):
+            if os.path.isdir(base):
+                for name in sorted(os.listdir(base), reverse=True):
+                    if name.lower().startswith('pypy3'):
+                        dirs.append(os.path.join(base, name))
         pkgs = os.path.join(local, 'Microsoft', 'WinGet', 'Packages')
         if os.path.isdir(pkgs):
             for name in os.listdir(pkgs):
-                if name.lower().startswith('brechtsanders.winlibs'):
+                low = name.lower()
+                if low.startswith('brechtsanders.winlibs'):
                     dirs.append(os.path.join(pkgs, name, 'mingw64', 'bin'))
+                elif low.startswith('pypy.pypy.3'):
+                    # winget PyPy: Packages\PyPy.PyPy.3.xx_...\pypy3.xx-v7.x.x-win64\pypy3.exe
+                    top = os.path.join(pkgs, name)
+                    dirs.append(top)
+                    for sub in sorted(os.listdir(top), reverse=True):
+                        dirs.append(os.path.join(top, sub))
     seen, out = set(), []
     for d in dirs:
         d = d.strip().strip('"')
@@ -117,7 +137,40 @@ def tool_version(path):
         return None
 
 
-TOOLS = {'gcc': find_tool('gcc'), 'g++': find_tool('g++'), 'javac': find_tool('javac'), 'java': find_tool('java')}
+TOOLS = {'gcc': find_tool('gcc'), 'g++': find_tool('g++'), 'javac': find_tool('javac'), 'java': find_tool('java'),
+         'rustc': find_tool('rustc'), 'pypy': find_tool('pypy3') or find_tool('pypy')}
+
+
+def pypy_version():
+    """'PyPy 7.3.20 (Python 3.11.13)' 처럼 보여 준다. pypy가 아닌 python이 잡히면 없는 것으로 본다."""
+    if not TOOLS['pypy']:
+        return None
+    try:
+        r = subprocess.run([TOOLS['pypy'], '-c',
+                            "import sys, platform; v = getattr(sys, 'pypy_version_info', None); "
+                            "print('PyPy %d.%d.%d (Python %s)' % (v[0], v[1], v[2], platform.python_version()) if v else '')"],
+                           capture_output=True, timeout=20, creationflags=NO_WINDOW)
+        return r.stdout.decode('utf-8', 'replace').strip() or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def rust_host_triple():
+    """rustc가 만드는 실행 파일 종류 (윈도우는 gnu / msvc 에 따라 스택 크기 옵션이 다르다)."""
+    if not TOOLS['rustc']:
+        return ''
+    try:
+        r = subprocess.run([TOOLS['rustc'], '-vV'], capture_output=True, timeout=10, creationflags=NO_WINDOW)
+        for ln in r.stdout.decode('utf-8', 'replace').splitlines():
+            if ln.startswith('host:'):
+                return ln.split(':', 1)[1].strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return ''
+
+
+RUST_HOST = rust_host_triple()
+PYPY_VERSION = pypy_version()
 
 
 def child_env():
@@ -137,6 +190,8 @@ def info():
         'gcc': tool_version(TOOLS['gcc']),
         'gpp': tool_version(TOOLS['g++']),
         'javac': tool_version(TOOLS['javac']) if TOOLS['java'] else None,
+        'rustc': tool_version(TOOLS['rustc']),
+        'pypy': PYPY_VERSION,
     }
 
 
@@ -152,6 +207,10 @@ def prepare(lang, code, workdir, interactive):
         src = os.path.join(workdir, 'main.py')
         with open(src, 'w', encoding='utf-8', newline='\n') as f:
             f.write(code)
+        if lang.get('pypy'):
+            if not PYPY_VERSION:
+                return None, None, {'code': 'nocompiler', 'message': 'PyPy(pypy3)를 찾지 못했어요.'}, None
+            return [TOOLS['pypy'], '-u', src], f'pypy3 main.py  ({PYPY_VERSION})', None, None
         return [sys.executable, '-u', src], f'python main.py  (Python {sys.version.split()[0]})', None, None
 
     if kind == 'java':
@@ -173,6 +232,36 @@ def prepare(lang, code, workdir, interactive):
         cmd = [java, '-Xss512m', '-Dfile.encoding=UTF-8', '-XX:+UseSerialGC',
                '-DONLINE_JUDGE=1', '-DBOJ=1', '-cp', workdir, 'Main']
         return cmd, 'javac Main.java && java -Xss512m Main', None, output
+
+    if kind == 'rust':
+        rustc = TOOLS['rustc']
+        if not rustc:
+            return None, None, {'code': 'nocompiler', 'message': 'Rust 컴파일러(rustc)를 찾지 못했어요.'}, None
+        edition = str(lang.get('edition') or '2021')
+        if not edition.isdigit():
+            edition = '2021'
+        src = os.path.join(workdir, 'main.rs')
+        exe = os.path.join(workdir, 'main.exe' if IS_WIN else 'main')
+        with open(src, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(code)
+        # 백준: rustc --edition 20XX -O
+        args = [rustc, '--edition', edition, '-O', '-o', exe, src]
+        if IS_WIN:
+            # 윈도우 기본 스택(1MB)을 256MB로 (gnu / msvc 링커마다 옵션 모양이 다르다)
+            if 'msvc' in RUST_HOST:
+                args += ['-C', 'link-arg=/STACK:268435456']
+            else:
+                args += ['-C', 'link-arg=-Wl,--stack,268435456']
+        shown = f'rustc --edition {edition} -O main.rs'
+        try:
+            r = subprocess.run(args, capture_output=True, timeout=120, cwd=workdir,
+                               creationflags=NO_WINDOW, env=child_env())
+        except subprocess.TimeoutExpired:
+            return None, shown, {'code': 'compile', 'message': '컴파일이 120초를 넘겨 중단했어요.'}, None
+        output = (r.stderr + r.stdout).decode('utf-8', 'replace').replace(workdir + os.sep, '')
+        if r.returncode != 0:
+            return None, shown, {'code': 'compile', 'message': output}, None
+        return [exe], shown, None, output
 
     is_c = kind == 'c'
     compiler = TOOLS['gcc' if is_c else 'g++']

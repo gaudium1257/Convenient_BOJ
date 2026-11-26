@@ -9,10 +9,12 @@ const FALLBACK = {
   clangc: 'clang-17.0.1-c',
   clangcpp: 'clang-17.0.1',
   python: 'cpython-3.13.18',
+  pypy: 'pypy-3.11-v8.0.1',
   java: 'openjdk-jdk-21+35',
+  rust: 'rust-1.90.0',
 };
 const DAY = 24 * 60 * 60 * 1000;
-const CACHE_KEY = 'wandboxCompilers2';
+const CACHE_KEY = 'wandboxCompilers4';
 
 let compilerCache = null;
 
@@ -44,7 +46,9 @@ async function compilers() {
       clangc: pick(/^clang-\d+\.\d+\.\d+-c$/),
       clangcpp: pick(/^clang-\d+\.\d+\.\d+$/),
       python: pick(/^cpython-3\.\d+\.\d+$/),
+      pypy: pick(/^pypy-3\.\d+-v\d+\.\d+\.\d+$/),
       java: pick(/^openjdk-jdk-\d+/),
+      rust: pick(/^rust-\d+\.\d+\.\d+$/),
     };
     for (const k in FALLBACK) map[k] = map[k] || FALLBACK[k];
     await chrome.storage.local.set({ [CACHE_KEY]: { at: Date.now(), map } });
@@ -67,7 +71,7 @@ async function run({ lang, code, stdin }) {
   const map = await compilers();
   let compiler, options = [], source = code, file = 'main.cpp';
   if (lang.kind === 'python') {
-    compiler = map.python;
+    compiler = lang.pypy ? map.pypy : map.python;
     file = 'main.py';
   } else if (lang.kind === 'java') {
     compiler = map.java;
@@ -75,6 +79,11 @@ async function run({ lang, code, stdin }) {
     // Wandbox는 소스 파일 이름이 prog.java라서 'public class Main'을 그대로 컴파일하지 못한다.
     // 줄 수가 바뀌지 않게 public만 지운다.
     source = code.replace(/\bpublic\s+((?:final\s+)?class\s+Main\b)/, '$1');
+  } else if (lang.kind === 'rust') {
+    // 백준: rustc --edition 20XX -O
+    compiler = map.rust;
+    file = 'main.rs';
+    options = ['--edition=' + (lang.edition || '2021'), '-O'];
   } else if (lang.kind === 'c') {
     compiler = lang.clang ? map.clangc : map.c;
     file = 'main.c';
@@ -84,7 +93,7 @@ async function run({ lang, code, stdin }) {
     options = ['-O2', '-std=' + (lang.std || 'gnu++17'), '-DONLINE_JUDGE', '-DBOJ'];
   }
   // 컴파일러 메시지의 파일 이름을 사용자가 보는 이름으로 바꾼다
-  const rename = (t) => String(t || '').replace(/\bprog\.(?:cc|c|cpp|java|py)\b/g, file);
+  const rename = (t) => String(t || '').replace(/\bprog\.(?:cc|c|cpp|java|py|rs)\b/g, file);
 
   const started = Date.now();
   let lastError = '실행 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.';
