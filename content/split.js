@@ -902,9 +902,10 @@
       const port = runnerPort();
       if (!port) { settleRunnerWaiters(); return; }
       port.postMessage({ type: 'info' });
+      // 도우미가 없으면 곧바로 'nohost'가 오고, 있으면 첫 시작이 느린 PC(막 켠 직후, 백신 검사)도 있어서 넉넉히 기다린다
       setTimeout(() => {
         if (runner.state === 'unknown') { runner.state = 'off'; runner.error = '응답 없음'; settleRunnerWaiters(); }
-      }, 4000);
+      }, 10000);
     });
   }
 

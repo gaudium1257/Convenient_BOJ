@@ -1,3 +1,5 @@
+<img src="icons/icon128.png" width="72" alt="Convenient BOJ 아이콘">
+
 # Convenient BOJ
 
 백준(acmicpc.net) 문제 화면에서 **문제 읽기 → 코드 작성 → 실행 → 제출 → 정/오답 확인**을 한 화면에서 끝내는 크롬 확장 프로그램이에요.
@@ -194,6 +196,14 @@ git tag v1.0.1; git push origin v1.0.1
 | `Convenient_BOJ-webstore.zip` | 크롬 웹 스토어 업로드용 (`key`와 도우미 제외) |
 
 웹 스토어 등록 문구·스크린샷·권한 사유는 [docs/store/LISTING.md](docs/store/LISTING.md)에 있어요. 웹 스토어에 처음 올리면 스토어가 새 확장 ID를 줘요. 그 ID를 `host/install.ps1` 의 `$ExtensionIds` 에 추가하고 새 버전을 배포해야 스토어 버전도 내 PC 실행 도우미에 연결돼요.
+
+## 만든 사람
+
+<a href="https://gaudium1257.github.io"><img src="icons/th-mark.svg" width="40" alt="TH"></a>
+
+**gaudium1257** · [포트폴리오](https://gaudium1257.github.io) · [GitHub](https://github.com/gaudium1257)
+
+아이콘과 팝업 색은 제 브랜드(TH 블록 모노그램, 보라 그라디언트)에 맞춰 만들었어요.
 
 ## 라이선스
 

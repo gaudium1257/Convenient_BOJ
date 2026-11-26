@@ -18,7 +18,6 @@ const OUT = path.join(REPO, 'docs', 'store');
 const RAW = path.join(HERE, 'out', 'store-raw');
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const BOJ = 'https://www.acmicpc.net';
-const ACCENT = '#0076C0';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.mkdirSync(OUT, { recursive: true });
 fs.mkdirSync(RAW, { recursive: true });
@@ -155,6 +154,13 @@ const shot5bg = await raw('5-rust-run');
 // ───────── 합성: 위에 설명 한 줄 + 아래 화면 ─────────
 const dataUri = (p) => 'data:image/png;base64,' + fs.readFileSync(p).toString('base64');
 const icon = dataUri(path.join(REPO, 'icons', 'icon128.png'));
+const thMark = 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(REPO, 'icons', 'th-mark.svg')).toString('base64');
+// 만든 사람(TH, gaudium1257.github.io) 브랜드 색
+const BRAND = { ink: '#1c1626', from: '#8b5cf6', to: '#4c1d95', light: '#ddd6fe', soft: '#c4b5fd' };
+const GRAD = `linear-gradient(135deg, ${BRAND.from}, ${BRAND.to})`;
+const signature = (size = 15, color = BRAND.light) => `<div style="display:flex;align-items:center;gap:8px;font-size:${size}px;color:${color};white-space:nowrap">
+  <img src="${thMark}" style="width:${Math.round(size * 1.6)}px;height:${Math.round(size * 1.6)}px;border-radius:${Math.round(size * 0.4)}px;box-shadow:0 0 0 1.5px rgba(255,255,255,.35)">
+  <span>Made by <b style="color:#fff;font-weight:800">gaudium1257</b></span></div>`;
 const canvas = await browser.newPage();
 const FONT = `font-family: 'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;`;
 
@@ -168,11 +174,13 @@ async function render(file, width, height, body) {
 }
 
 function captioned(title, sub, inner) {
-  return `<div style="height:80px;background:${ACCENT};color:#fff;display:flex;align-items:center;gap:18px;padding:0 36px">
-      <img src="${icon}" style="width:44px;height:44px;border-radius:10px;background:#fff">
-      <div><div style="font-size:26px;font-weight:800;letter-spacing:-0.5px">${title}</div>
-      <div style="font-size:15px;opacity:.9;margin-top:3px">${sub}</div></div></div>
-    <div style="height:720px;overflow:hidden;position:relative;background:#EEF1F4">${inner}</div>`;
+  return `<div style="height:76px;background:${BRAND.ink};color:#fff;display:flex;align-items:center;gap:18px;padding:0 32px">
+      <img src="${icon}" style="width:46px;height:46px;border-radius:11px;box-shadow:0 0 0 1.5px rgba(255,255,255,.25)">
+      <div style="flex:1;min-width:0"><div style="font-size:25px;font-weight:800;letter-spacing:-0.5px">${title}</div>
+      <div style="font-size:14.5px;color:${BRAND.soft};margin-top:3px">${sub}</div></div>
+      ${signature(14)}</div>
+    <div style="height:4px;background:linear-gradient(90deg, ${BRAND.from}, ${BRAND.to})"></div>
+    <div style="height:720px;overflow:hidden;position:relative;background:#f6f4fa">${inner}</div>`;
 }
 const full = (p) => `<img src="${dataUri(p)}" style="display:block;width:1280px;height:720px">`;
 
@@ -185,21 +193,22 @@ await render('screenshot-5.png', 1280, 800, captioned('백준과 같은 컴파�
   <img src="${dataUri(popPath)}" style="position:absolute;left:150px;top:22px;width:342px;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.4)">`));
 
 // 작은 프로모션 타일 440×280
-await render('promo-small-440x280.png', 440, 280, `<div style="width:440px;height:280px;background:linear-gradient(135deg,${ACCENT},#00A3E0);color:#fff;padding:34px 32px;display:flex;flex-direction:column;justify-content:space-between">
-  <div style="display:flex;align-items:center;gap:14px"><img src="${icon}" style="width:60px;height:60px;border-radius:14px;background:#fff">
+await render('promo-small-440x280.png', 440, 280, `<div style="width:440px;height:280px;background:${GRAD};color:#fff;padding:30px 30px 24px;display:flex;flex-direction:column;justify-content:space-between">
+  <div style="display:flex;align-items:center;gap:14px"><img src="${icon}" style="width:60px;height:60px;border-radius:14px;box-shadow:0 0 0 2px rgba(255,255,255,.5),0 8px 20px rgba(28,22,38,.35)">
     <div style="font-size:30px;font-weight:800;letter-spacing:-0.5px;line-height:1.1">Convenient<br>BOJ</div></div>
-  <div><div style="font-size:21px;font-weight:700">문제 · 코드 · 실행 · 제출을</div><div style="font-size:21px;font-weight:700">한 화면에서</div>
-  <div style="font-size:13px;opacity:.85;margin-top:8px">백준을 위한 비공식 확장 프로그램</div></div></div>`);
+  <div><div style="font-size:20px;font-weight:700;line-height:1.35">문제 · 코드 · 실행 · 제출을<br>한 화면에서</div></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:${BRAND.light}"><span>백준 비공식 확장</span>${signature(12)}</div></div>`);
 
 // 마키 1400×560 (선택)
-await render('promo-marquee-1400x560.png', 1400, 560, `<div style="width:1400px;height:560px;background:linear-gradient(135deg,${ACCENT},#00A3E0);color:#fff;display:flex;align-items:center;padding:0 70px;gap:56px">
+await render('promo-marquee-1400x560.png', 1400, 560, `<div style="width:1400px;height:560px;background:${GRAD};color:#fff;display:flex;align-items:center;padding:0 70px;gap:56px">
   <div style="flex:0 0 470px">
-    <div style="display:flex;align-items:center;gap:18px"><img src="${icon}" style="width:76px;height:76px;border-radius:16px;background:#fff">
+    <div style="display:flex;align-items:center;gap:18px"><img src="${icon}" style="width:76px;height:76px;border-radius:17px;box-shadow:0 0 0 2px rgba(255,255,255,.5),0 10px 26px rgba(28,22,38,.35)">
       <div style="font-size:44px;font-weight:800;letter-spacing:-1px">Convenient BOJ</div></div>
     <div style="font-size:30px;font-weight:700;margin-top:30px;line-height:1.35">문제 · 코드 · 실행 · 제출을<br>한 화면에서</div>
-    <div style="font-size:17px;opacity:.9;margin-top:18px;line-height:1.6">C · C++ · Java · Rust · Python · PyPy3<br>백준과 같은 컴파일 옵션 · 실시간 채점 결과</div>
+    <div style="font-size:17px;color:${BRAND.light};margin-top:18px;line-height:1.6">C · C++ · Java · Rust · Python · PyPy3<br>백준과 같은 컴파일 옵션 · 실시간 채점 결과</div>
+    <div style="margin-top:34px">${signature(16)}</div>
   </div>
-  <img src="${dataUri(shot1)}" style="width:740px;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35)"></div>`);
+  <img src="${dataUri(shot1)}" style="width:740px;border-radius:12px;box-shadow:0 20px 60px rgba(28,22,38,.45)"></div>`);
 
 await browser.close();
 console.log('saved to', OUT);

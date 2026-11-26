@@ -27,7 +27,7 @@ import tempfile
 import threading
 import time
 
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 IS_WIN = os.name == 'nt'
 NO_WINDOW = 0x08000000 if IS_WIN else 0  # CREATE_NO_WINDOW: 콘솔 창이 뜨지 않게
 OUT_LIMIT = 2_000_000                    # 실시간 출력 최대 바이트 (넘으면 종료)
@@ -170,20 +170,37 @@ def rust_host_triple():
     return ''
 
 
-RUST_HOST = rust_host_triple()
-PYPY_VERSION = pypy_version()
-
-
-def javac_major():
+def javac_major(version):
     """'javac 17.0.20.1' → 17, 'javac 1.8.0_201' → 8, 모르면 0"""
-    m = re.search(r'javac (\d+)(?:\.(\d+))?', tool_version(TOOLS['javac']) or '')
+    m = re.search(r'javac (\d+)(?:\.(\d+))?', version or '')
     if not m:
         return 0
     major = int(m.group(1))
     return int(m.group(2) or 0) if major == 1 else major
 
 
-JAVAC_MAJOR = javac_major()
+# 도구 버전 확인은 시작할 때 한 번, 동시에 한다.
+# (하나씩 하면 javac·pypy 처럼 느린 것들이 쌓여 첫 응답이 3초 가까이 걸려서,
+#  확장이 '도우미 없음'으로 보고 Wandbox로 실행해 버릴 수 있다)
+def _probe_versions():
+    from concurrent.futures import ThreadPoolExecutor
+    jobs = {
+        'gcc': lambda: tool_version(TOOLS['gcc']),
+        'gpp': lambda: tool_version(TOOLS['g++']),
+        'javac': lambda: tool_version(TOOLS['javac']) if TOOLS['java'] else None,
+        'rustc': lambda: tool_version(TOOLS['rustc']),
+        'rust_host': rust_host_triple,
+        'pypy': pypy_version,
+    }
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futures = {k: pool.submit(f) for k, f in jobs.items()}
+        return {k: f.result() for k, f in futures.items()}
+
+
+VERSIONS = _probe_versions()
+RUST_HOST = VERSIONS['rust_host'] or ''
+PYPY_VERSION = VERSIONS['pypy']
+JAVAC_MAJOR = javac_major(VERSIONS['javac'])
 
 
 def child_env():
@@ -200,10 +217,10 @@ def info():
         'type': 'info',
         'version': VERSION,
         'python': sys.version.split()[0],
-        'gcc': tool_version(TOOLS['gcc']),
-        'gpp': tool_version(TOOLS['g++']),
-        'javac': tool_version(TOOLS['javac']) if TOOLS['java'] else None,
-        'rustc': tool_version(TOOLS['rustc']),
+        'gcc': VERSIONS['gcc'],
+        'gpp': VERSIONS['gpp'],
+        'javac': VERSIONS['javac'],
+        'rustc': VERSIONS['rustc'],
         'pypy': PYPY_VERSION,
     }
 
