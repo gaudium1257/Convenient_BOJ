@@ -193,7 +193,7 @@ git tag v1.0.1; git push origin v1.0.1
 | `Convenient_BOJ-helper.zip` | 도우미만 (웹 스토어 사용자용, 팝업의 [도우미 받기]가 받는 파일) |
 | `Convenient_BOJ-webstore.zip` | 크롬 웹 스토어 업로드용 (`key`와 도우미 제외) |
 
-웹 스토어에 처음 올리면 스토어가 새 확장 ID를 줘요. 그 ID를 `host/install.ps1` 의 `$ExtensionIds` 에 추가하고 새 버전을 배포해야 스토어 버전도 내 PC 실행 도우미에 연결돼요.
+웹 스토어 등록 문구·스크린샷·권한 사유는 [docs/store/LISTING.md](docs/store/LISTING.md)에 있어요. 웹 스토어에 처음 올리면 스토어가 새 확장 ID를 줘요. 그 ID를 `host/install.ps1` 의 `$ExtensionIds` 에 추가하고 새 버전을 배포해야 스토어 버전도 내 PC 실행 도우미에 연결돼요.
 
 ## 라이선스
 
