@@ -27,7 +27,9 @@
     // PyPy3는 Python 3와 같은 코드·기본 코드를 쓰고, 실행만 PyPy로 한다
     if (/^PyPy3/.test(name)) return { kind: 'python', family: 'py', pypy: true, mode: 'text/x-python' };
     if (/^Python 3/.test(name)) return { kind: 'python', family: 'py', mode: 'text/x-python' };
-    if (/^Java\b/.test(name)) return { kind: 'java', family: 'java', mode: 'text/x-java' };
+    // 백준은 javac -release <버전>으로 컴파일한다 (Java 8, Java 8 (OpenJDK), Java 11, Java 15 …)
+    const java = /^Java(?: (\d+))?/.exec(name);
+    if (java) return { kind: 'java', family: 'java', release: java[1] || '11', mode: 'text/x-java' };
     const rust = /^Rust(?: (\d{4}))?/.exec(name);
     if (rust) return { kind: 'rust', family: 'rust', edition: rust[1] || '2021', mode: 'rust' };
     let m = /^C\+\+(\d+)?/.exec(name);
@@ -683,6 +685,11 @@
 
   function runtimeNote(res) {
     if (res.signal) return `프로그램이 신호(${res.signal})로 종료됐어요`;
+    // Wandbox는 너무 오래 도는 프로그램을 약 55초에 강제 종료한다 (종료 코드 137)
+    if (String(res.status) === '137') {
+      return res.ms > 30000 ? '시간 초과: 실행 서버 제한 시간(약 55초)을 넘겨 강제 종료됐어요. 무한 루프가 없는지 확인해 주세요.'
+        : '강제 종료됐어요 (종료 코드 137, 메모리를 너무 많이 썼을 수 있어요)';
+    }
     if (res.status && res.status !== '0') return `종료 코드 ${res.status}`;
     return '';
   }

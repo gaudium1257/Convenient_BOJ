@@ -3,33 +3,49 @@
 // 콘텐츠 스크립트에서 바로 부르면 CORS·권한 문제가 생길 수 있어 여기서 대신 요청한다.
 
 const WANDBOX = 'https://wandbox.org/api';
+// 백준 채점 환경(https://help.acmicpc.net/language/info)과 같거나 가장 가까운 버전을 고른다.
+// 최신 버전으로 실행하면 백준에 없는 문법·함수가 여기서만 통과해 버리기 때문.
+//   gcc 11.1 (C++23/26만 gcc 14.2) · clang 12 · Python 3.13 · PyPy 7.3 (Python 3.10) · rustc 1.90
+//   Java는 컴파일러 버전 대신 백준처럼 --release 로 맞춘다 (아래 run 참고)
+const BOJ_VERSION = {
+  c: /^gcc-11\./,
+  cpp: /^gcc-11\./,
+  clangc: /^clang-12\./,
+  clangcpp: /^clang-12\./,
+  python: /^cpython-3\.13\./,
+  pypy: /^pypy-3\.10-/,
+  rust: /^rust-1\.90\./,
+};
 const FALLBACK = {
-  c: 'gcc-13.2.0-c',
-  cpp: 'gcc-13.2.0',
-  clangc: 'clang-17.0.1-c',
-  clangcpp: 'clang-17.0.1',
+  c: 'gcc-11.4.0-c',
+  cpp: 'gcc-11.4.0',
+  cppNew: 'gcc-13.2.0', // C++23/26 (백준은 gcc 14.2)
+  clangc: 'clang-14.0.6-c',
+  clangcpp: 'clang-14.0.6',
   python: 'cpython-3.13.18',
-  pypy: 'pypy-3.11-v8.0.1',
+  pypy: 'pypy-3.10-v7.3.19',
   java: 'openjdk-jdk-21+35',
   rust: 'rust-1.90.0',
 };
 const DAY = 24 * 60 * 60 * 1000;
-const CACHE_KEY = 'wandboxCompilers4';
+const CACHE_KEY = 'wandboxCompilers5';
 
 let compilerCache = null;
 
 function versionKey(name) {
   return (name.match(/\d+/g) || []).map(Number);
 }
+// 버전 비교: a가 b보다 새것이면 양수
+function compareVersion(a, b) {
+  const x = versionKey(a), y = versionKey(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
 function newest(names) {
-  return names.sort((a, b) => {
-    const x = versionKey(a), y = versionKey(b);
-    for (let i = 0; i < Math.max(x.length, y.length); i++) {
-      const d = (y[i] || 0) - (x[i] || 0);
-      if (d) return d;
-    }
-    return 0;
-  })[0];
+  return [...names].sort((a, b) => compareVersion(b, a))[0];
 }
 
 async function compilers() {
@@ -40,15 +56,24 @@ async function compilers() {
     const list = await (await fetch(WANDBOX + '/list.json')).json();
     const names = list.map((c) => c.name);
     const pick = (re) => newest(names.filter((n) => re.test(n)));
+    // 백준과 같은 버전이 있으면 그것, 없으면 그보다 새것 중 가장 오래된 것(가장 가까운 것), 그것도 없으면 최신
+    const near = (key, re) => {
+      const all = names.filter((n) => re.test(n));
+      const same = all.filter((n) => BOJ_VERSION[key].test(n));
+      if (same.length) return newest(same);
+      const newer = all.filter((n) => compareVersion(n, FALLBACK[key]) >= 0).sort(compareVersion);
+      return newer[0] || newest(all);
+    };
     const map = {
-      c: pick(/^gcc-\d+\.\d+\.\d+-c$/),
-      cpp: pick(/^gcc-\d+\.\d+\.\d+$/),
-      clangc: pick(/^clang-\d+\.\d+\.\d+-c$/),
-      clangcpp: pick(/^clang-\d+\.\d+\.\d+$/),
-      python: pick(/^cpython-3\.\d+\.\d+$/),
-      pypy: pick(/^pypy-3\.\d+-v\d+\.\d+\.\d+$/),
+      c: near('c', /^gcc-\d+\.\d+\.\d+-c$/),
+      cpp: near('cpp', /^gcc-\d+\.\d+\.\d+$/),
+      cppNew: pick(/^gcc-\d+\.\d+\.\d+$/),
+      clangc: near('clangc', /^clang-\d+\.\d+\.\d+-c$/),
+      clangcpp: near('clangcpp', /^clang-\d+\.\d+\.\d+$/),
+      python: near('python', /^cpython-3\.\d+\.\d+$/),
+      pypy: near('pypy', /^pypy-3\.\d+-v\d+\.\d+\.\d+$/),
       java: pick(/^openjdk-jdk-\d+/),
-      rust: pick(/^rust-\d+\.\d+\.\d+$/),
+      rust: near('rust', /^rust-\d+\.\d+\.\d+$/),
     };
     for (const k in FALLBACK) map[k] = map[k] || FALLBACK[k];
     await chrome.storage.local.set({ [CACHE_KEY]: { at: Date.now(), map } });
@@ -79,6 +104,8 @@ async function run({ lang, code, stdin }) {
     // Wandbox는 소스 파일 이름이 prog.java라서 'public class Main'을 그대로 컴파일하지 못한다.
     // 줄 수가 바뀌지 않게 public만 지운다.
     source = code.replace(/\bpublic\s+((?:final\s+)?class\s+Main\b)/, '$1');
+    // 백준: javac -release 11 (Java 8이면 8) → 그 버전에 없는 API는 컴파일 에러가 나게
+    options = ['--release', String(lang.release || '11'), '-Xlint:-options'];
   } else if (lang.kind === 'rust') {
     // 백준: rustc --edition 20XX -O
     compiler = map.rust;
@@ -89,7 +116,9 @@ async function run({ lang, code, stdin }) {
     file = 'main.c';
     options = ['-O2', '-std=' + (lang.std || 'gnu11'), '-DONLINE_JUDGE', '-DBOJ', '-lm'];
   } else {
-    compiler = lang.clang ? map.clangcpp : map.cpp;
+    // 백준 C++23/26은 gcc 14라서 가장 새 gcc로
+    const modern = /(?:23|26|2b|2c)$/.test(lang.std || '');
+    compiler = lang.clang ? map.clangcpp : modern ? map.cppNew : map.cpp;
     options = ['-O2', '-std=' + (lang.std || 'gnu++17'), '-DONLINE_JUDGE', '-DBOJ'];
   }
   // 컴파일러 메시지의 파일 이름을 사용자가 보는 이름으로 바꾼다
@@ -101,7 +130,9 @@ async function run({ lang, code, stdin }) {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt) await sleep(800 * attempt);
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 40000);
+    // 오래 안 쓴 컴파일러는 Wandbox 첫 요청에 40초 넘게 걸리기도 해서 넉넉히 기다린다
+    // (무한 루프는 Wandbox가 스스로 끊는다)
+    const timer = setTimeout(() => ctrl.abort(), 90000);
     try {
       const res = await fetch(WANDBOX + '/compile.json', {
         method: 'POST',
@@ -127,7 +158,7 @@ async function run({ lang, code, stdin }) {
         ms: Date.now() - started,
       };
     } catch (e) {
-      if (e.name === 'AbortError') return { ok: false, error: '실행 시간이 너무 오래 걸려 중단했어요 (40초). 무한 루프가 없는지 확인해 주세요.', compiler };
+      if (e.name === 'AbortError') return { ok: false, error: '실행 서버(Wandbox)가 90초 동안 응답하지 않아 중단했어요. 잠시 후 다시 실행해 주세요. (무한 루프라면 코드를 확인해 주세요)', compiler };
       lastError = '실행 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.';
     } finally {
       clearTimeout(timer);

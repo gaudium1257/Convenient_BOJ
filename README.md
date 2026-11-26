@@ -48,7 +48,11 @@
   - 설치하지 않았다면 입력을 미리 적고 **이 입력으로 실행**을 누르면, 끝난 뒤 결과를 한꺼번에 보여 줘요(Wandbox).
 - 터미널 탭 오른쪽 위에 지금 **실행 위치**(● 내 PC / ● Wandbox)가 보여요.
 - 언어 목록은 백준 [언어 설정]에서 고른 언어를 따라요. C(C99/C11/…), C++(C++14/17/20/…, Clang 포함), Java(8/11/…), Rust(2018/2021/…), Python 3 / PyPy3 를 지원해요. PyPy3를 고르면 실행도 PyPy로 해요(Python 3와 코드·기본 코드는 같이 써요).
-- 컴파일·실행 옵션은 백준과 맞췄어요: C/C++ `-O2 -std=<버전> -DONLINE_JUDGE` (C는 `-lm`), Java `-Xss512m -DONLINE_JUDGE=1`, Rust `rustc --edition <에디션> -O`
+- 컴파일·실행 옵션은 백준과 맞췄어요: C/C++ `-O2 -std=<버전> -DONLINE_JUDGE` (C는 `-lm`), Java `--release <버전> -Xss512m -DONLINE_JUDGE=1`, Rust `rustc --edition <에디션> -O`
+- **컴파일러 버전도 백준에 맞춰요.** 최신 버전으로 실행하면 백준에 없는 문법·함수가 여기서만 통과할 수 있어서예요.
+  - Wandbox: gcc 11 (C++23/26은 최신 gcc), clang 14 (백준 12와 가장 가까운 버전), Python 3.13, PyPy 3.10, Rust 1.90
+  - Java는 백준처럼 `--release 11`(Java 8이면 8)로 컴파일해요. 내 PC에 JDK 17·21이 깔려 있어도 Java 12 이후에 생긴 API(`stream().toList()` 등)는 컴파일 에러가 나요.
+  - 내 PC 실행은 설치된 버전(Python·PyPy·gcc·Rust)을 그대로 써요. 터미널 첫 줄에 쓰인 버전을 확인해 주세요.
   - 내 PC 실행 때 윈도우 기본 스택(1MB)은 백준보다 훨씬 작아서, C/C++·Rust는 스택을 256MB로 키워 깊은 재귀도 백준처럼 돌아가게 했어요.
 - Wandbox(온라인)가 바쁘거나 잠깐 끊기면 자동으로 두 번까지 다시 시도해요.
 

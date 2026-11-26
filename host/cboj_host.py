@@ -18,6 +18,7 @@
 import codecs
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -26,7 +27,7 @@ import tempfile
 import threading
 import time
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 IS_WIN = os.name == 'nt'
 NO_WINDOW = 0x08000000 if IS_WIN else 0  # CREATE_NO_WINDOW: 콘솔 창이 뜨지 않게
 OUT_LIMIT = 2_000_000                    # 실시간 출력 최대 바이트 (넘으면 종료)
@@ -173,6 +174,18 @@ RUST_HOST = rust_host_triple()
 PYPY_VERSION = pypy_version()
 
 
+def javac_major():
+    """'javac 17.0.20.1' → 17, 'javac 1.8.0_201' → 8, 모르면 0"""
+    m = re.search(r'javac (\d+)(?:\.(\d+))?', tool_version(TOOLS['javac']) or '')
+    if not m:
+        return 0
+    major = int(m.group(1))
+    return int(m.group(2) or 0) if major == 1 else major
+
+
+JAVAC_MAJOR = javac_major()
+
+
 def child_env():
     env = dict(os.environ)
     extra = [os.path.dirname(p) for p in TOOLS.values() if p]
@@ -220,18 +233,26 @@ def prepare(lang, code, workdir, interactive):
         src = os.path.join(workdir, 'Main.java')  # 백준 규칙: public class Main
         with open(src, 'w', encoding='utf-8', newline='\n') as f:
             f.write(code)
+        # 백준: javac -release 11 (Java 8이면 8). 설치된 JDK가 더 새것이어도 그 버전에 없는 API는 컴파일 에러가 나게 한다.
+        # --release는 JDK 9부터 있고, JDK보다 높은 버전은 줄 수 없다.
+        release = str(lang.get('release') or '11')
+        args = [javac, '-encoding', 'UTF-8', '-J-Xss512m']
+        shown = 'javac Main.java'
+        if release.isdigit() and 9 <= JAVAC_MAJOR and int(release) <= JAVAC_MAJOR:
+            args += ['--release', release, '-Xlint:-options']
+            shown = f'javac --release {release} Main.java'
         try:
-            r = subprocess.run([javac, '-encoding', 'UTF-8', '-J-Xss512m', src], capture_output=True, timeout=90,
+            r = subprocess.run(args + [src], capture_output=True, timeout=90,
                                cwd=workdir, creationflags=NO_WINDOW, env=child_env())
         except subprocess.TimeoutExpired:
-            return None, 'javac Main.java', {'code': 'compile', 'message': '컴파일이 90초를 넘겨 중단했어요.'}, None
+            return None, shown, {'code': 'compile', 'message': '컴파일이 90초를 넘겨 중단했어요.'}, None
         output = (r.stderr + r.stdout).decode('utf-8', 'replace').replace(workdir + os.sep, '')
         if r.returncode != 0:
-            return None, 'javac Main.java', {'code': 'compile', 'message': output}, None
+            return None, shown, {'code': 'compile', 'message': output}, None
         # 백준 Java 11 실행 옵션과 같게 (스택 512MB, ONLINE_JUDGE 속성)
         cmd = [java, '-Xss512m', '-Dfile.encoding=UTF-8', '-XX:+UseSerialGC',
                '-DONLINE_JUDGE=1', '-DBOJ=1', '-cp', workdir, 'Main']
-        return cmd, 'javac Main.java && java -Xss512m Main', None, output
+        return cmd, shown + ' && java -Xss512m Main', None, output
 
     if kind == 'rust':
         rustc = TOOLS['rustc']
