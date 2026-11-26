@@ -247,7 +247,7 @@
     where.addEventListener('click', () => {
       if (runner.state === 'on') return;
       checkRunner(true).then(() => {
-        if (runner.state !== 'on') window.open('https://github.com/gaudium1257/Convenient_BOJ#2단계-내-pc에서-실행-진짜-터미널-선택', '_blank');
+        if (runner.state !== 'on') window.open(globalThis.CBOJ_LINKS.helperGuide, '_blank');
       });
     });
     [tabResult, tabCases, tabTerm].forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));

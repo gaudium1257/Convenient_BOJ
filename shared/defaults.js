@@ -23,6 +23,12 @@ globalThis.CBOJ_TEMPLATES = Object.freeze({
   py: '', // 파이썬은 보통 기본 코드 없이 시작한다 (빠른 입력이 필요하면 팝업에서 추가)
 });
 
+// 내 PC 실행 도우미 안내·내려받기 주소 (웹 스토어로 설치한 사람은 도우미 ZIP을 따로 받는다)
+globalThis.CBOJ_LINKS = Object.freeze({
+  helperGuide: 'https://github.com/gaudium1257/Convenient_BOJ#내-pc-실행-도우미-선택-windows',
+  helperZip: 'https://github.com/gaudium1257/Convenient_BOJ/releases/latest/download/Convenient_BOJ-helper.zip',
+});
+
 // 기본 코드 문자열에서 $0 을 빼고 커서 위치를 돌려준다.
 globalThis.cbojExpandTemplate = (text) => {
   const s = String(text == null ? '' : text);

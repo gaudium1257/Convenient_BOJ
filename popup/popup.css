@@ -34,7 +34,7 @@ h1 { margin: 0; font-size: 16px; font-weight: 800; }
   margin-bottom: 8px;
 }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; border-top: 1px dashed var(--line); }
-h2 { margin: 0; font-size: 13px; font-weight: 700; }
+h2 { margin: 0; font-size: 13px; font-weight: 700; white-space: nowrap; }
 
 .seg { display: inline-flex; background: #EEF1F4; border-radius: 9px; padding: 2px; }
 .seg button {
@@ -64,7 +64,8 @@ h2 { margin: 0; font-size: 13px; font-weight: 700; }
 .keys dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 8px 0 0; font-size: 12px; }
 .keys dt { font-family: Consolas, monospace; color: var(--ink); background: #EEF1F4; border-radius: 5px; padding: 0 6px; }
 .keys dd { margin: 0; color: var(--muted); }
-.note { margin: 6px 2px 0; color: var(--muted); font-size: 11px; }
+.note { margin: 6px 2px 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.note a { color: var(--muted); }
 
 /* 기본 코드 */
 .tpl { padding: 6px 12px 10px; }
@@ -94,6 +95,7 @@ h2 { margin: 0; font-size: 13px; font-weight: 700; }
 .runner-state small { font-size: 11px; font-weight: 400; color: var(--muted); }
 .runner-state a { font-size: 11px; font-weight: 600; color: var(--accent); text-decoration: none; }
 .runner-state a:hover { text-decoration: underline; }
+.runner-links { display: flex; gap: 8px; }
 .card > .row.runner + .toggle { border-top: 1px dashed var(--line); }
 
 /* 기본 코드 언어 탭 4개가 들어가도록 */

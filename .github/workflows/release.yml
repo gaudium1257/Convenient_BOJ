@@ -39,6 +39,12 @@ jobs:
           jq 'del(.key)' manifest.json > store/manifest.json
           (cd store && zip -qr ../Convenient_BOJ-webstore.zip .)
           unzip -l Convenient_BOJ-webstore.zip | tail -3
+          # 3) 내 PC 실행 도우미만: 웹 스토어로 설치한 사람이 받는 파일
+          #    (주소가 releases/latest/download/Convenient_BOJ-helper.zip 로 고정이라 팝업에서 바로 내려받는다)
+          mkdir -p helper/ConvenientBOJ-helper
+          cp host/cboj_host.py host/install.bat host/install.ps1 host/uninstall.bat host/uninstall.ps1 LICENSE helper/ConvenientBOJ-helper/
+          (cd helper && zip -qr ../Convenient_BOJ-helper.zip ConvenientBOJ-helper)
+          unzip -l Convenient_BOJ-helper.zip
 
       - name: 아티팩트로 올리기
         uses: actions/upload-artifact@v4
@@ -47,13 +53,14 @@ jobs:
           path: |
             Convenient_BOJ.zip
             Convenient_BOJ-webstore.zip
+            Convenient_BOJ-helper.zip
 
       - name: Releases에 올리기
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" Convenient_BOJ.zip Convenient_BOJ-webstore.zip \
+          gh release create "$GITHUB_REF_NAME" Convenient_BOJ.zip Convenient_BOJ-webstore.zip Convenient_BOJ-helper.zip \
             --repo "$GITHUB_REPOSITORY" \
             --title "Convenient BOJ $GITHUB_REF_NAME" \
             --notes "$(cat <<'NOTES'
@@ -64,10 +71,15 @@ jobs:
 
           업데이트할 때는 새 ZIP을 받아 같은 폴더에 덮어쓰고, `chrome://extensions` 에서 새로고침(↻)을 누르면 됩니다.
 
-          ## 내 PC에서 실행 (진짜 터미널, 선택)
-          압축을 푼 폴더의 `host\install.bat` 을 더블클릭하고 묻는 대로 답하면 돼요. (Windows)
+          ## 내 PC 실행 도우미 (진짜 터미널, 선택, Windows)
+          - ZIP으로 설치했다면: 압축을 푼 폴더의 `host\install.bat` 을 더블클릭하고 묻는 대로 답하면 돼요.
+          - 크롬 웹 스토어로 설치했다면: 아래 **Convenient_BOJ-helper.zip** 을 받아 압축을 풀고 `install.bat` 을 더블클릭하세요.
 
-          > `Convenient_BOJ-webstore.zip` 은 크롬 웹 스토어 업로드용이에요. 직접 설치할 때는 `Convenient_BOJ.zip` 을 쓰세요.
+          | 파일 | 용도 |
+          | --- | --- |
+          | `Convenient_BOJ.zip` | 직접 설치용 (확장 + 실행 도우미) |
+          | `Convenient_BOJ-helper.zip` | 실행 도우미만 (웹 스토어 사용자용) |
+          | `Convenient_BOJ-webstore.zip` | 크롬 웹 스토어 업로드용 (개발자용) |
           NOTES
           )" \
             --generate-notes
