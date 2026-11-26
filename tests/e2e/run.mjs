@@ -200,6 +200,12 @@ async function scenario(mode, extDir) {
       if (lang === 'PyPy3' && /\[Wandbox\]/.test(t)) r.check('PyPy3가 Wandbox에서 진짜 PyPy로 실행', /\$ pypy-3\.10/.test(t) && /PyPy/.test(t.replace(/pypy-3/g, '')), firstLines(t, 2));
       if (lang === 'Java 11' && /\[Wandbox\]/.test(t)) r.check('Java가 Wandbox에서 --release 11', /--release 11/.test(t), firstLines(t, 2));
       if (lang === 'Rust 2021' && /\[Wandbox\]/.test(t)) r.check('Rust가 Wandbox rust-1.90.0', /rust-1\.90\.0 --edition=2021 -O main\.rs/.test(t), firstLines(t, 2));
+      // 내 PC 도우미에 그 언어가 설치돼 있으면 백준과 같은 옵션으로 도는지
+      if (/\[내 PC\]/.test(t)) {
+        if (lang === 'Java 11') r.check('Java가 내 PC에서 --release 11', /javac --release 11 Main\.java/.test(t), firstLines(t, 2));
+        if (lang === 'Rust 2021') r.check('Rust가 내 PC에서 rustc --edition 2021 -O', /rustc --edition 2021 -O main\.rs/.test(t), firstLines(t, 2));
+        if (lang === 'PyPy3') r.check('PyPy3가 내 PC에서 진짜 PyPy로 실행', /pypy3 main\.py\s+\(PyPy/.test(t) && /(^|\n)PyPy(\n|$)/.test(t), firstLines(t, 2));
+      }
     });
   }
   await shot('02-run');
